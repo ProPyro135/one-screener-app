@@ -1,9 +1,11 @@
-# Runtime dependencies for the hosted read-only dashboard (Streamlit Community
-# Cloud installs from this file). These are the reader's needs only — the
-# ingestion stack (yfinance, requests, openpyxl) is not imported by app/dashboard.py.
-# Versions match pyproject.toml so the host matches local.
-streamlit==1.62.0
-plotly==6.9.0
-pandas==2.3.3
-duckdb==1.5.5
-numpy==2.2.6
+# Runtime deps for the hosted read-only dashboard (Streamlit Community Cloud,
+# installed with uv). Left unpinned on purpose: the host runs a very recent
+# Python (3.14+), and exact pins to older versions have no matching wheels there
+# — uv would build numpy/pandas/duckdb from source and time out. The dashboard
+# uses only stable APIs, so the current releases are safe. Pin here later if a
+# future major release breaks something.
+streamlit
+plotly
+pandas
+duckdb
+numpy
