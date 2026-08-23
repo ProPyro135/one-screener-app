@@ -211,7 +211,8 @@ BB_FILL = "rgba(120, 123, 134, 0.16)"
 #: The script draws the bands and dots ``-(pattern + 1)`` bars back, because a
 #: fractal is not confirmable until that many bars after it. The values are
 #: stored at the date they were computed; the shift is applied here, on render.
-FCB_DRAW_OFFSET = -2
+#: pattern=2 (see indicators.FCB_PATTERN) -> -(2 + 1).
+FCB_DRAW_OFFSET = -3
 
 
 # ---------------------------------------------------------------------------
@@ -372,14 +373,20 @@ def _add_fractal_bands(fig, history: pd.DataFrame, p: dict) -> None:
     ):
         if column not in history or history[column].isna().all():
             continue
+        # Solid bands: straight lines between points (TradingView plot.style_line),
+        # so a level move is a single diagonal, not a stiff right-angle step.
+        # Held levels: a continuous dotted horizontal line that runs across the
+        # bars it held for — `hv` keeps each level flat and steps at a change,
+        # matching the dotted projections in the reference charts.
+        line = (
+            dict(width=1.2, color=colour, dash="dot", shape="hv")
+            if dotted
+            else dict(width=1.4, color=colour, shape="linear")
+        )
         fig.add_trace(
             go.Scatter(
                 x=dates, y=shifted(column), name=label,
-                mode="markers" if dotted else "lines",
-                marker=dict(size=2.5, color=colour) if dotted else None,
-                # hv: the level holds, then jumps. That is the indicator, not a
-                # drawing flourish - it only moves when a new fractal lands.
-                line=None if dotted else dict(width=1.4, color=colour, shape="hv"),
+                mode="lines", line=line,
                 connectgaps=False,
                 hoverinfo="skip" if dotted else None,
                 showlegend=not dotted,

@@ -244,9 +244,11 @@ def donchian(
     }
 
 
-#: Defaults from the Pine source this reproduces. Named rather than inlined so
-#: a reader can check them against the script.
-FCB_PATTERN = 1
+#: Fractal window. pattern=2 (a 5-bar fractal: a peak higher than the two bars
+#: each side) was chosen against the owner's TradingView charts — pattern=1
+#: stepped far too often, pattern=3 barely produced a band. It sets how many
+#: bars back the band is drawn: -(pattern+1), see charts.FCB_DRAW_OFFSET.
+FCB_PATTERN = 2
 FCB_MIN_DOT_HOLD = 5
 BB_PERIOD = 20
 BB_MULT = 2.0
