@@ -211,8 +211,8 @@ BB_FILL = "rgba(120, 123, 134, 0.16)"
 #: The script draws the bands and dots ``-(pattern + 1)`` bars back, because a
 #: fractal is not confirmable until that many bars after it. The values are
 #: stored at the date they were computed; the shift is applied here, on render.
-#: pattern=2 (see indicators.FCB_PATTERN) -> -(2 + 1).
-FCB_DRAW_OFFSET = -3
+#: pattern=1 (see indicators.FCB_PATTERN) -> -(1 + 1).
+FCB_DRAW_OFFSET = -2
 
 
 # ---------------------------------------------------------------------------
