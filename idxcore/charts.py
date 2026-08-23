@@ -201,9 +201,11 @@ KUMO_SHIFT = 26
 #: sets transparency 28 on the band lines, 82 on the held-level dots and 84 on
 #: the Bollinger fill — Pine transparency is the inverse of alpha.
 FCB_UP = "rgba(41, 98, 255, 0.72)"
-FCB_DOWN = "rgba(255, 82, 82, 0.72)"
+#: The lower band is orange, not the script's red: a red line on top of red down
+#: candles is unreadable. Blue upper stays as the script draws it.
+FCB_DOWN = "rgba(251, 140, 0, 0.9)"       # #FB8C00
 FCB_DOT_UP = "rgba(41, 98, 255, 0.18)"
-FCB_DOT_DOWN = "rgba(255, 82, 82, 0.18)"
+FCB_DOT_DOWN = "rgba(251, 140, 0, 0.5)"   # orange held-low dots
 BB_FILL = "rgba(120, 123, 134, 0.16)"
 
 #: The script draws the bands and dots ``-(pattern + 1)`` bars back, because a
@@ -239,7 +241,7 @@ _LIGHT_PALETTE = {
     "fcb_up": FCB_UP,
     "fcb_down": FCB_DOWN,
     "fcb_dot_up": "rgba(41, 98, 255, 0.28)",    # the 0.18 dots disappear on white
-    "fcb_dot_down": "rgba(255, 82, 82, 0.28)",
+    "fcb_dot_down": "rgba(251, 140, 0, 0.55)",  # orange held-low dots
     "volume_up": "#26A69A",
     "volume_down": "#C1554E",
     "rsi": "#3F51B5",        # indigo: the pale #7E9BFF washes out on white

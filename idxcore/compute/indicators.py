@@ -247,7 +247,6 @@ def donchian(
 #: Defaults from the Pine source this reproduces. Named rather than inlined so
 #: a reader can check them against the script.
 FCB_PATTERN = 1
-FCB_BEAR_STEP = 5
 FCB_MIN_DOT_HOLD = 5
 BB_PERIOD = 20
 BB_MULT = 2.0
@@ -315,111 +314,63 @@ def _same(a: float, b: float) -> bool:
 def fractal_chaos_bands(
     high: pd.Series,
     low: pd.Series,
-    close: pd.Series,
     *,
     pattern: int = FCB_PATTERN,
-    bear_step: int = FCB_BEAR_STEP,
     min_dot_hold: int = FCB_MIN_DOT_HOLD,
 ) -> dict[str, pd.Series]:
-    """Fractal Chaos Bands with the trend-following step, and the held levels.
+    """Classic Fractal Chaos Bands, plus the held levels.
 
-    A faithful port of the Pine indicator, including the two things that make it
-    behave unlike a plain fractal band:
+    The upper band is the last confirmed up-fractal (a swing high) carried
+    forward until a new one forms; the lower band is the last down-fractal. Each
+    band is a *level*: it holds flat, then jumps when a new fractal lands, which
+    is what makes the pair read as a clean stepped envelope with the upper above
+    price and the lower below it — matching the owner's TradingView charts.
 
-    **The step.** Once price closes below the lower band the trend flips down,
-    and from then on the upper band is dragged to ``highest(high[1], 5)``
-    whenever that sits lower. Without it the blue line strands itself at an old
-    high and stops describing anything; with it the band follows price down in
-    steps. Mirrored on the way up.
+    An earlier port also applied the script's optional "bearish blue step-down",
+    which drags a band toward price on a trend flip. Measured against the
+    reference charts (BUMI/RATU/BNBR) that made the bands hug the candles and
+    cross constantly, unlike the screenshots, so it is not applied here. The
+    plain bands are what the charts show.
 
-    **The dots.** When a band moves, its previous value is frozen as a level —
-    but only if it had held for at least ``min_dot_hold`` bars. That filter is
-    why a handful of levels persist rather than one per fractal, and it is what
-    makes them worth drawing.
+    **The dots.** When a band jumps to a new fractal, its previous value is
+    frozen as a held level — but only if it had lasted at least
+    ``min_dot_hold`` bars. That filter is why a handful of levels persist rather
+    than one dot per fractal.
 
-    **The bands may cross, and that is not a fault.** Each is the last fractal
-    of its kind, updated independently, so during a fast move one can refresh
-    while the other is still stale — on BUMI.JK in February 2018 the upper had
-    already fallen to 318 while the lower stood at 320 from before the drop.
-    Measured over that ticker's full history: 44 crossings from the raw
-    fractals alone and 97 once the step is enabled, which drags one band toward
-    price and creates more opportunities for it. The Pine source constrains the
-    pair nowhere, so clamping them here would be a change to the indicator
-    rather than a fix to the port.
-
-    Every value here is a function of bars at or before its own date. The
-    two-bar display shift the script applies is a drawing decision and is not
-    baked in here, so nothing in this table is future-dated.
+    Every value is a function of bars at or before its own date. The two-bar
+    display shift the script applies is a drawing decision and lives in
+    `charts.py`, so nothing stored here is future-dated.
     """
     h = pd.to_numeric(high, errors="coerce").to_numpy(dtype=float)
     l = pd.to_numeric(low, errors="coerce").to_numpy(dtype=float)
-    c = pd.to_numeric(close, errors="coerce").to_numpy(dtype=float)
     n = len(h)
 
     up_raw, dn_raw = _raw_fractals(h, l, pattern)
 
-    upper = np.full(n, np.nan)
-    lower = np.full(n, np.nan)
+    # The band IS the carried-forward fractal — no trend, no drag.
+    upper = up_raw.astype(float).copy()
+    lower = dn_raw.astype(float).copy()
     dot_up = np.full(n, np.nan)
     dot_dn = np.full(n, np.nan)
 
-    cur_up = np.nan
-    cur_dn = np.nan
-    trend = 0
     prev_dot_up = np.nan
     prev_dot_dn = np.nan
     up_start = 0
     dn_start = 0
 
     for t in range(n):
-        was_up, was_dn = cur_up, cur_dn
-
-        if np.isnan(cur_up):
-            cur_up = up_raw[t]
-        if np.isnan(cur_dn):
-            cur_dn = dn_raw[t]
-
-        # Uses the band as it stood at the end of the previous bar, exactly as
-        # the script does — the assignments below have not run yet.
-        if not np.isnan(cur_up) and c[t] > cur_up:
-            trend = 1
-        if not np.isnan(cur_dn) and c[t] < cur_dn:
-            trend = -1
-
         if t > 0 and not _same(up_raw[t], up_raw[t - 1]):
-            cur_up = up_raw[t]
-        if t > 0 and not _same(dn_raw[t], dn_raw[t - 1]):
-            cur_dn = dn_raw[t]
-
-        if t >= bear_step:
-            window_hi = h[t - bear_step:t]
-            window_lo = l[t - bear_step:t]
-            bear_high = np.nanmax(window_hi) if window_hi.size else np.nan
-            bull_low = np.nanmin(window_lo) if window_lo.size else np.nan
-            if trend == -1 and not np.isnan(bear_high) and (
-                np.isnan(cur_up) or bear_high < cur_up
-            ):
-                cur_up = bear_high
-            if trend == 1 and not np.isnan(bull_low) and (
-                np.isnan(cur_dn) or bull_low > cur_dn
-            ):
-                cur_dn = bull_low
-
-        if not _same(cur_up, was_up):
-            if t - up_start >= min_dot_hold and not np.isnan(was_up):
-                prev_dot_up = was_up
+            if t - up_start >= min_dot_hold and not np.isnan(up_raw[t - 1]):
+                prev_dot_up = up_raw[t - 1]
             up_start = t
-        if not _same(cur_dn, was_dn):
-            if t - dn_start >= min_dot_hold and not np.isnan(was_dn):
-                prev_dot_dn = was_dn
+        if t > 0 and not _same(dn_raw[t], dn_raw[t - 1]):
+            if t - dn_start >= min_dot_hold and not np.isnan(dn_raw[t - 1]):
+                prev_dot_dn = dn_raw[t - 1]
             dn_start = t
-
-        upper[t] = cur_up
-        lower[t] = cur_dn
         dot_up[t] = prev_dot_up
         dot_dn[t] = prev_dot_dn
 
-    index = close.index if hasattr(close, "index") else None
+    index = high.index if hasattr(high, "index") else None
     return {
         "fcb_upper": pd.Series(upper, index=index),
         "fcb_lower": pd.Series(lower, index=index),
@@ -460,7 +411,7 @@ def compute_for_ticker(
         for name, series in donchian(data["high"], data["low"]).items():
             out[name] = series
         for name, series in fractal_chaos_bands(
-            data["high"], data["low"], close
+            data["high"], data["low"]
         ).items():
             out[name] = series
     else:
