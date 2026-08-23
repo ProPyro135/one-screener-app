@@ -471,23 +471,26 @@ def build_combined_figure(
     *,
     height: int = 760,
     theme: str = "dark",
+    show_extras: bool = False,
 ) -> go.Figure:
-    """Price, volume and RSI stacked on one shared time axis.
+    """Price and volume stacked on one shared time axis; MAs and RSI optional.
 
-    Three panels rather than three figures, so the crosshair lines up across
-    all of them and a volume spike can be read against the bar that caused it.
-    Non-trading days are collapsed once, for the whole stack.
+    ``show_extras=False`` (the default) draws the chart the owner reads from —
+    candles, the grey Bollinger cloud, the fractal bands and volume — with no
+    moving averages and no RSI panel, matching his TradingView setup. With it on
+    the five MAs return to the price panel and an RSI panel is added below, for
+    reading the six criteria off the chart. The panels share one time axis so
+    the crosshair lines up and a volume spike reads against its bar.
     """
     from plotly.subplots import make_subplots
 
     p = palette(theme)
 
+    rows = 3 if show_extras else 2
+    row_heights = [0.62, 0.16, 0.22] if show_extras else [0.78, 0.22]
     fig = make_subplots(
-        rows=3,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.62, 0.16, 0.22],
+        rows=rows, cols=1, shared_xaxes=True,
+        vertical_spacing=0.03, row_heights=row_heights,
     )
 
     # Bollinger and the fractal bands replace the Kumo and Donchian channel in
@@ -507,15 +510,17 @@ def build_combined_figure(
         ),
         row=1, col=1,
     )
-    for column, colour in p["ma"].items():
-        if column in history and history[column].notna().any():
-            fig.add_trace(
-                go.Scatter(
-                    x=history["date"], y=history[column], name=column.upper(),
-                    mode="lines", line=dict(width=p["ma_width"][column], color=colour),
-                ),
-                row=1, col=1,
-            )
+    if show_extras:
+        for column, colour in p["ma"].items():
+            if column in history and history[column].notna().any():
+                fig.add_trace(
+                    go.Scatter(
+                        x=history["date"], y=history[column], name=column.upper(),
+                        mode="lines",
+                        line=dict(width=p["ma_width"][column], color=colour),
+                    ),
+                    row=1, col=1,
+                )
 
     _add_corporate_actions(fig, history)
 
@@ -537,7 +542,7 @@ def build_combined_figure(
             row=2, col=1,
         )
 
-    if "rsi14" in history and history["rsi14"].notna().any():
+    if show_extras and "rsi14" in history and history["rsi14"].notna().any():
         fig.add_trace(
             go.Scatter(
                 x=history["date"], y=history["rsi14"], name="RSI(14)",
@@ -567,8 +572,8 @@ def build_combined_figure(
     )
     _add_price_badges(fig, history, p)
     fig.update_xaxes(rangeslider_visible=False)
-    # All three price-stack axes on the right, like TradingView. automargin
-    # keeps the labels off the plot despite the l=0/r=0 margins.
+    # Axes on the right, like TradingView. automargin keeps the labels off the
+    # plot despite the l=0/r=0 margins.
     fig.update_yaxes(
         title_text="Price (IDR)", gridcolor=p["grid"],
         side="right", automargin=True, row=1, col=1,
@@ -577,10 +582,11 @@ def build_combined_figure(
         title_text="Vol", gridcolor=p["grid"],
         side="right", automargin=True, row=2, col=1,
     )
-    fig.update_yaxes(
-        title_text="RSI", gridcolor=p["grid"], range=[0, 100],
-        side="right", automargin=True, row=3, col=1,
-    )
+    if show_extras:
+        fig.update_yaxes(
+            title_text="RSI", gridcolor=p["grid"], range=[0, 100],
+            side="right", automargin=True, row=3, col=1,
+        )
 
     # Nothing is drawn past the last bar any more, so the axis stops there.
     _apply_trading_calendar(fig, history["date"])

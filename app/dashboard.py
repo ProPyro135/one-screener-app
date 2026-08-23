@@ -437,6 +437,10 @@ def render_detail(
     only_matches = st.checkbox(
         t("chart_only_matches", lang), value=False, key="detail_only_matches"
     )
+    show_extras = st.checkbox(
+        t("chart_show_extras", lang), value=False, key="detail_extras",
+        help=t("chart_extras_help", lang),
+    )
     if only_matches and not matches.empty:
         options = sorted(matches["ticker"].dropna().unique())
         default = 0
@@ -477,7 +481,7 @@ def render_detail(
         st.warning(t("warn_stale", lang), icon="⚠️")
 
     st.plotly_chart(
-        build_combined_figure(history, choice, theme=theme),
+        build_combined_figure(history, choice, theme=theme, show_extras=show_extras),
         use_container_width=True,
         config=PLOTLY_CONFIG,
     )

@@ -370,6 +370,14 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     "chart_bars": {"en": "Bars to show", "id": "Jumlah bar ditampilkan"},
     "chart_only_matches": {"en": "Limit to matching tickers",
                            "id": "Batasi ke saham yang cocok"},
+    "chart_show_extras": {"en": "Show moving averages & RSI",
+                          "id": "Tampilkan moving average & RSI"},
+    "chart_extras_help": {
+        "en": "Off by default, to match the TradingView-style chart. Turn on to "
+              "see the five MAs and the RSI panel behind the six criteria.",
+        "id": "Mati secara default, agar mirip grafik ala TradingView. Nyalakan "
+              "untuk melihat lima MA dan panel RSI di balik enam kriteria.",
+    },
     "chart_no_history": {"en": "No stored history for this ticker.",
                          "id": "Belum ada riwayat tersimpan untuk saham ini."},
     "chart_price_note": {
