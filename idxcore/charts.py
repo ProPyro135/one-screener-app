@@ -58,6 +58,13 @@ RSI_COLOUR = "#7E9BFF"
 DIVIDEND_MARKER = "#1E88E5"
 SPLIT_MARKER = "#F57C00"
 
+#: The trend ribbon's four states, coloured as the owner's screenshots draw them
+#: (see indicators.trend_ribbon). Same on both themes — the meaning is the same.
+#: 3 strong-up, 2 weak-up, 1 weak-down, 0 strong-down.
+RIBBON_COLOURS = {3: "#4CAF50", 2: "#2962FF", 1: "#F4A4A4", 0: "#FF5252"}
+#: The capitulation histogram's dark-red squares.
+CAPITULATION_COLOUR = "#8B0000"
+
 
 #: Plotly config for every chart the app renders, matching what a trader
 #: expects from a charting platform rather than from a plotting library.
@@ -259,6 +266,8 @@ _LIGHT_PALETTE = {
     "badge_ma_text": "#FFFFFF",
     "dividend_marker": DIVIDEND_MARKER,
     "split_marker": SPLIT_MARKER,
+    "ribbon": RIBBON_COLOURS,
+    "capitulation": CAPITULATION_COLOUR,
 }
 
 THEMES = {
@@ -286,6 +295,8 @@ THEMES = {
         "badge_ma_text": "#0E1117",
         "dividend_marker": DIVIDEND_MARKER,
         "split_marker": SPLIT_MARKER,
+        "ribbon": RIBBON_COLOURS,
+        "capitulation": CAPITULATION_COLOUR,
     },
     "light": _LIGHT_PALETTE,
 }
@@ -465,32 +476,87 @@ def _add_price_badges(fig, history: pd.DataFrame, p: dict) -> None:
         )
 
 
+def _add_ribbon(fig, history: pd.DataFrame, p: dict, row: int) -> None:
+    """The trend ribbon: one unit-height cell per bar, coloured by state.
+
+    A fitted approximation of the owner's screenshot ribbon (see
+    indicators.trend_ribbon). With the figure's bargap at 0 the cells touch, so
+    the states read as continuous blocks rather than a picket fence. Warm-up
+    bars (no state) are drawn transparent.
+    """
+    if "ribbon" not in history or history["ribbon"].isna().all():
+        return
+    colours = [
+        p["ribbon"].get(int(s), "rgba(0,0,0,0)") if pd.notna(s) else "rgba(0,0,0,0)"
+        for s in history["ribbon"]
+    ]
+    fig.add_trace(
+        go.Bar(
+            x=history["date"], y=[1] * len(history),
+            marker_color=colours, marker_line_width=0,
+            name="Trend", showlegend=False, hoverinfo="skip",
+        ),
+        row=row, col=1,
+    )
+
+
+def _add_capitulation(fig, history: pd.DataFrame, p: dict, row: int) -> None:
+    """The capitulation histogram: a fixed -1 bar on each flagged day.
+
+    Placeholder trigger (see indicators.capitulation_marker). The fixed height
+    matches the screenshots, where every square sits at the same depth.
+    """
+    if "capitulation" not in history or history["capitulation"].isna().all():
+        return
+    flag = pd.to_numeric(history["capitulation"], errors="coerce").fillna(0)
+    fig.add_trace(
+        go.Bar(
+            x=history["date"], y=[-1 if v else 0 for v in flag],
+            marker_color=p["capitulation"], marker_line_width=0,
+            name="Capitulation", showlegend=False, hoverinfo="skip",
+        ),
+        row=row, col=1,
+    )
+    fig.add_hline(y=0, line_dash="dash", line_color=p["axis_text"],
+                  line_width=1, row=row, col=1)
+
+
 def build_combined_figure(
     history: pd.DataFrame,
     ticker: str,
     *,
-    height: int = 760,
+    height: int = 820,
     theme: str = "dark",
     show_extras: bool = False,
 ) -> go.Figure:
     """Price and volume stacked on one shared time axis; MAs and RSI optional.
 
     ``show_extras=False`` (the default) draws the chart the owner reads from —
-    candles, the grey Bollinger cloud, the fractal bands and volume — with no
-    moving averages and no RSI panel, matching his TradingView setup. With it on
-    the five MAs return to the price panel and an RSI panel is added below, for
-    reading the six criteria off the chart. The panels share one time axis so
-    the crosshair lines up and a volume spike reads against its bar.
+    candles, the grey Bollinger cloud, the fractal bands, volume, and the two
+    lower panels from his TradingView setup: the fitted trend ribbon and the
+    capitulation histogram — with no moving averages and no RSI panel. With it
+    on the five MAs return to the price panel and an RSI panel slots in above
+    the ribbon, for reading the six criteria off the chart. The panels share one
+    time axis so the crosshair lines up and a volume spike reads against its bar.
     """
     from plotly.subplots import make_subplots
 
     p = palette(theme)
 
-    rows = 3 if show_extras else 2
-    row_heights = [0.62, 0.16, 0.22] if show_extras else [0.78, 0.22]
+    # Panels, top to bottom: price, volume, [RSI when extras], trend ribbon,
+    # capitulation histogram. The ribbon and histogram are always drawn — they
+    # are what the owner's TradingView screenshots show below the price.
+    rsi_row = 3 if show_extras else None
+    ribbon_row = 4 if show_extras else 3
+    hist_row = 5 if show_extras else 4
+    rows = 5 if show_extras else 4
+    row_heights = (
+        [0.48, 0.13, 0.15, 0.09, 0.15] if show_extras
+        else [0.58, 0.16, 0.10, 0.16]
+    )
     fig = make_subplots(
         rows=rows, cols=1, shared_xaxes=True,
-        vertical_spacing=0.03, row_heights=row_heights,
+        vertical_spacing=0.02, row_heights=row_heights,
     )
 
     # Bollinger and the fractal bands replace the Kumo and Donchian channel in
@@ -549,7 +615,7 @@ def build_combined_figure(
                 mode="lines", line=dict(color=p["rsi"], width=1.6),
                 showlegend=False,
             ),
-            row=3, col=1,
+            row=rsi_row, col=1,
         )
         for level, colour, dash in (
             (50, p["gate"], "dash"),
@@ -558,8 +624,11 @@ def build_combined_figure(
         ):
             fig.add_hline(
                 y=level, line_dash=dash, line_color=colour,
-                line_width=1.6 if level == 50 else 1, row=3, col=1,
+                line_width=1.6 if level == 50 else 1, row=rsi_row, col=1,
             )
+
+    _add_ribbon(fig, history, p, ribbon_row)
+    _add_capitulation(fig, history, p, hist_row)
 
     fig.update_layout(
         **_layout(
@@ -567,7 +636,9 @@ def build_combined_figure(
             height=height,
             margin=dict(l=0, r=0, t=10, b=0),
             legend=dict(orientation="h", y=1.02, yanchor="bottom"),
-            bargap=0.1,
+            # 0 so the ribbon cells touch and read as continuous blocks; the
+            # volume bars touching too is normal for a trading chart.
+            bargap=0.0,
         )
     )
     _add_price_badges(fig, history, p)
@@ -585,8 +656,17 @@ def build_combined_figure(
     if show_extras:
         fig.update_yaxes(
             title_text="RSI", gridcolor=p["grid"], range=[0, 100],
-            side="right", automargin=True, row=3, col=1,
+            side="right", automargin=True, row=rsi_row, col=1,
         )
+    # The ribbon is a colour strip: no scale to read, so its y-axis is hidden.
+    fig.update_yaxes(
+        title_text="Trend", showticklabels=False, range=[0, 1],
+        side="right", automargin=True, row=ribbon_row, col=1,
+    )
+    fig.update_yaxes(
+        title_text="Cap.", gridcolor=p["grid"], range=[-3, 0.2],
+        side="right", automargin=True, row=hist_row, col=1,
+    )
 
     # Nothing is drawn past the last bar any more, so the axis stops there.
     _apply_trading_calendar(fig, history["date"])

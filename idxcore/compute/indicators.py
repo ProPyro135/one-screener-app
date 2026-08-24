@@ -69,6 +69,8 @@ INDICATOR_COLUMNS = [
     "fcb_lower",
     "fcb_dot_upper",
     "fcb_dot_lower",
+    "ribbon",
+    "capitulation",
     "bars_available",
     "computed_at",
 ]
@@ -421,6 +423,57 @@ def fractal_chaos_bands(
     }
 
 
+# ---------------------------------------------------------------------------
+# The two lower panels, fit to the owner's TradingView screenshots.
+#
+# There is no Pine source for either — unlike the FCB/Bollinger bands, the owner
+# could not supply it (HANDOFF §7). These were reverse-engineered by extracting
+# the actual per-bar colours from three screenshots (RATU/BUMI/BNBR) and fitting
+# candidate indicators to them against the real stored prices. They are therefore
+# *approximations*, deliberately kept obvious so they are cheap to tune:
+#
+#   * `ribbon` reproduces the ribbon's up/down direction well (~80%) and its
+#     shade less so (~62% overall). Direction = an 8/21 EMA cross; shade = the
+#     sign of the MACD line. State 3=green, 2=blue, 1=salmon, 0=red.
+#   * `capitulation` is a placeholder for the rare dark-red histogram squares —
+#     "close below the lower Bollinger band". It over-fires versus the
+#     screenshots and is the agreed next thing to tune.
+# ponytail: fitted approximations, not the original formulas; tune when the
+# source (or a better fit target) turns up.
+RIBBON_FAST, RIBBON_SLOW = 8, 21
+
+
+def trend_ribbon(close: pd.Series, macd_line: pd.Series) -> pd.Series:
+    """Fitted 4-state trend×momentum ribbon (see the module note above).
+
+    NaN until the EMAs and the MACD line are all defined — a warm-up bar has no
+    state, and 0 would read as a real "strong down" downstream.
+    """
+    close = pd.to_numeric(close, errors="coerce")
+    fast = close.ewm(span=RIBBON_FAST, adjust=False, min_periods=RIBBON_FAST).mean()
+    slow = close.ewm(span=RIBBON_SLOW, adjust=False, min_periods=RIBBON_SLOW).mean()
+    up = fast > slow
+    mom = macd_line > 0
+    state = np.where(up & mom, 3.0, np.where(up & ~mom, 2.0,
+                     np.where(~up & mom, 1.0, 0.0)))
+    out = pd.Series(state, index=close.index)
+    out[~(fast.notna() & slow.notna() & macd_line.notna())] = np.nan
+    return out
+
+
+def capitulation_marker(close: pd.Series, bb_lower: pd.Series) -> pd.Series:
+    """Placeholder down-capitulation flag: close below the lower Bollinger band.
+
+    1 on a flagged bar, 0 otherwise, NaN before the band exists. This is the
+    loose part of the port and is expected to change (see the module note).
+    """
+    close = pd.to_numeric(close, errors="coerce")
+    bb_lower = pd.to_numeric(bb_lower, errors="coerce")
+    out = (close < bb_lower).astype("float64")
+    out[bb_lower.isna()] = np.nan
+    return out
+
+
 def compute_for_ticker(
     frame: pd.DataFrame,
     *,
@@ -446,6 +499,11 @@ def compute_for_ticker(
     # channel that is not the one the exchange traded.
     for name, series in bollinger(close).items():
         out[name] = series
+
+    # The two lower panels. Both are close-based (no high/low needed), so they
+    # are computed here rather than in the high/low branch below.
+    out["ribbon"] = trend_ribbon(close, line)
+    out["capitulation"] = capitulation_marker(close, out["bb_lower"])
 
     if "high" in data.columns and "low" in data.columns:
         for name, series in ichimoku(data["high"], data["low"]).items():

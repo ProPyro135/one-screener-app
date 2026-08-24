@@ -162,6 +162,13 @@ CREATE TABLE IF NOT EXISTS indicators (
     fcb_lower      DOUBLE,
     fcb_dot_upper  DOUBLE,
     fcb_dot_lower  DOUBLE,
+    -- Two lower-panel indicators fit to the owner's TradingView screenshots,
+    -- with no Pine source to port (see compute/indicators.py). ribbon is a
+    -- 4-state trend x momentum ribbon (0..3); capitulation is a placeholder
+    -- down flag (0/1). Both approximate and display-only — the signal engine
+    -- does not read them.
+    ribbon         INTEGER,
+    capitulation   INTEGER,
     bars_available INTEGER NOT NULL,
     computed_at    TIMESTAMP NOT NULL,
     PRIMARY KEY (ticker, date)
