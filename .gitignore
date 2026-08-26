@@ -3,4 +3,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
-# the slim read-only store IS committed here — it is the app's only data source
+
+# The slim store is no longer committed — it is published as a GitHub Release
+# asset (tag slim-store) and downloaded at startup, so the repo does not grow by
+# ~38MB a trading day. data/slim_version.txt is the tiny marker whose daily change
+# triggers a redeploy. See idxcore/store/db.ensure_slim_store + scripts/publish_slim.ps1.
+data/idx_slim.duckdb
+data/*.part

@@ -28,6 +28,37 @@ SCHEMA_VERSION = "1"
 #: Where the store lives unless overridden by --db or IDXCORE_DB.
 DEFAULT_DB_PATH = Path("data") / "idx.duckdb"
 
+#: The hosted dashboard has no full store and no pipeline; it reads a slim,
+#: read-only snapshot published as a GitHub Release asset (overwritten each
+#: trading day by scripts/publish_slim.ps1). It is a Release asset, not a
+#: committed file, so the deploy repo does not grow by ~38MB a day. The app
+#: downloads it once per boot; a fresh deploy (triggered by the daily marker
+#: commit) always pulls the latest.
+SLIM_STORE_PATH = Path("data") / "idx_slim.duckdb"
+SLIM_STORE_URL = os.environ.get(
+    "SLIM_STORE_URL",
+    "https://github.com/ProPyro135/one-screener-app/releases/download/"
+    "slim-store/idx_slim.duckdb",
+)
+
+
+def ensure_slim_store(path: Path = SLIM_STORE_PATH, url: str = SLIM_STORE_URL) -> Path:
+    """Local slim store, downloading it from the Release asset if it is absent.
+
+    On the host the file does not exist on a fresh container, so it is fetched
+    once. Locally (developer machine) the full store is used instead and this is
+    never called, so no download happens.
+    """
+    if path.exists() and path.stat().st_size > 0:
+        return path
+    import urllib.request
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".part")
+    urllib.request.urlretrieve(url, tmp)  # noqa: S310 - fixed GitHub Release URL
+    tmp.replace(path)
+    return path
+
 INGEST_STATUSES = frozenset({
     "ok",
     "rate_limited",

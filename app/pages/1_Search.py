@@ -35,8 +35,8 @@ def _resolve_db_path() -> str:
     full = Path(db.DEFAULT_DB_PATH)
     if full.exists():
         return str(full)
-    slim = Path("data") / "idx_slim.duckdb"
-    return str(slim if slim.exists() else full)
+    # Hosted: no full store — fetch the slim snapshot from the Release asset.
+    return str(db.ensure_slim_store())
 
 
 DB_PATH = _resolve_db_path()
