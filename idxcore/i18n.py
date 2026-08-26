@@ -457,6 +457,21 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
         "en": "No signals stored yet. Run `idxcore compute` after a backfill.",
         "id": "Belum ada sinyal tersimpan. Jalankan `idxcore compute` setelah backfill.",
     },
+
+    # ---- search page ----
+    "sr_title": {"en": "Search a saham", "id": "Cari saham"},
+    "sr_caption": {
+        "en": ("Type a code or name to look up any stock — its chart, indicators and "
+               "the criteria it currently meets. Read-only, like the rest of the app."),
+        "id": ("Ketik kode atau nama untuk mencari saham mana pun — grafik, indikator, "
+               "dan kriteria yang sedang dipenuhinya. Hanya-baca, seperti bagian lain."),
+    },
+    "sr_saham": {"en": "Saham", "id": "Saham"},
+    "sr_placeholder": {"en": "e.g. BBCA, or Telkom", "id": "mis. BBCA, atau Telkom"},
+    "sr_meta": {
+        "en": "Criteria: {crit}  ·  Board: {board}  ·  Sector: {sector}",
+        "id": "Kriteria: {crit}  ·  Papan: {board}  ·  Sektor: {sector}",
+    },
 }
 
 
