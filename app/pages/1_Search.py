@@ -20,6 +20,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from idxcore.charts import PLOTLY_CONFIG, build_combined_figure  # noqa: E402
+from idxcore.compute import bottom_fishing as bf  # noqa: E402
 from idxcore.compute.signals import render_criteria  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db, read  # noqa: E402
@@ -114,6 +115,61 @@ except StoreBusy:
 if signals is None or signals.empty:
     st.error(t("no_store", lang, path=DB_PATH))
     st.stop()
+
+# ---------------------------------------------------------------------------
+# radar screener — each stock's current Bottom Fishing state, colour-coded
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=300, show_spinner="Menghitung radar…")
+def _radar():
+    with _connection() as con:
+        return None if con is None else bf.radar_screen(con, lookback=5)
+
+
+st.subheader(t("sr_screener", lang))
+try:
+    radar = _radar()
+except StoreBusy:
+    radar = None
+    st.info(t("store_busy", lang), icon="⏳")
+
+if radar is not None and not radar.empty:
+    st_label = {"naik": t("st_naik", lang), "bottom": t("st_bottom", lang),
+                "tunggu": t("st_tunggu", lang)}
+    order = {"naik": 0, "bottom": 1, "tunggu": 2}
+    picked = st.multiselect(
+        t("sr_status_filter", lang),
+        [st_label[k] for k in ("naik", "bottom", "tunggu")],
+        default=[st_label["naik"], st_label["bottom"]],
+    )
+    r = radar.copy()
+    r["_lbl"] = r["status"].map(st_label)
+    if picked:
+        r = r[r["_lbl"].isin(picked)]
+    r = r.sort_values("status", key=lambda s: s.map(order))
+    st.write(t("sr_screener_count", lang, n=len(r)))
+
+    tbl = pd.DataFrame({
+        t("c_ticker", lang): r["idx_code"].fillna(r["ticker"]),
+        t("c_name", lang): r["name"],
+        t("c_close", lang): r["close"],
+        t("sr_status", lang): r["_lbl"],
+        t("sr_signal", lang): r["code"],
+        t("sr_reason", lang): r["reason"],
+    })
+    palette = {st_label[k]: bf.STATUS_COLOUR[k] for k in st_label}
+
+    def _paint(v):
+        colour = palette.get(v)
+        return f"background-color: {colour}; color: white; font-weight: 600" if colour else ""
+
+    styled = (tbl.style
+              .map(_paint, subset=[t("sr_status", lang)])
+              .format({t("c_close", lang): "{:,.0f}"}))
+    st.dataframe(styled, use_container_width=True, hide_index=True)
+
+st.divider()
+st.subheader(f"🔎 {t('sr_lookup', lang)}")
 
 # Native searchable dropdown: "BBCA — Bank Central Asia Tbk."
 code = (signals["idx_code"] if "idx_code" in signals.columns else signals["ticker"])

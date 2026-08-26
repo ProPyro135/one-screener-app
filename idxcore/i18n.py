@@ -472,6 +472,19 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
         "en": "Criteria: {crit}  ·  Board: {board}  ·  Sector: {sector}",
         "id": "Kriteria: {crit}  ·  Papan: {board}  ·  Sektor: {sector}",
     },
+
+    # ---- search-page radar screener ----
+    "sr_screener": {"en": "Radar — where each stock is now",
+                    "id": "Radar — posisi tiap saham sekarang"},
+    "sr_screener_count": {"en": "**{n}** stock(s) shown.", "id": "**{n}** saham ditampilkan."},
+    "sr_status_filter": {"en": "Filter by status", "id": "Saring berdasarkan status"},
+    "sr_status": {"en": "Status", "id": "Status"},
+    "sr_signal": {"en": "Latest signal", "id": "Sinyal terakhir"},
+    "sr_reason": {"en": "Reason", "id": "Alasan"},
+    "sr_lookup": {"en": "Look up one stock", "id": "Cari satu saham"},
+    "st_naik": {"en": "RISING", "id": "LAGI NAIK"},
+    "st_bottom": {"en": "WATCH (BOTTOM)", "id": "PANTAU (BOTTOM)"},
+    "st_tunggu": {"en": "WAIT", "id": "TUNGGU"},
 }
 
 
