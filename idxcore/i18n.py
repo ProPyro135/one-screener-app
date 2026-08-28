@@ -485,6 +485,20 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     "st_naik": {"en": "RISING", "id": "LAGI NAIK"},
     "st_bottom": {"en": "WATCH (BOTTOM)", "id": "PANTAU (BOTTOM)"},
     "st_tunggu": {"en": "WAIT", "id": "TUNGGU"},
+    "st_pantau": {"en": "WATCH (PULLBACK)", "id": "PANTAU (PULLBACK)"},
+    "ms_title": {"en": "Market Structure", "id": "Market Structure"},
+    "ms_caption": {
+        "en": ("A second screener. Auto-switching regime (EMA20 in a volatile "
+               "swing, else SMA200), a rebound off a higher swing-low on dry "
+               "volume, then a volume-backed breakout. A monitoring view, not a "
+               "proven signal."),
+        "id": ("Screener kedua. Regime otomatis (EMA20 saat swing volatil, "
+               "selain itu SMA200), rebound dari swing-low yang lebih tinggi "
+               "dengan volume kering, lalu breakout didukung volume. Ini "
+               "pemantauan, bukan sinyal terbukti."),
+    },
+    "ms_screener": {"en": "Radar — where each stock is now",
+                    "id": "Radar — posisi tiap saham sekarang"},
 }
 
 
