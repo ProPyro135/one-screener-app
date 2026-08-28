@@ -83,7 +83,7 @@ st.caption(t("ms_caption", lang))
 @st.cache_data(ttl=300, show_spinner="Menghitung radar…")
 def _radar():
     with _connection() as con:
-        return None if con is None else ms.radar_screen(con, lookback=5)
+        return None if con is None else ms.radar_screen(con)  # last signal ever
 
 
 st.subheader(t("ms_screener", lang))
