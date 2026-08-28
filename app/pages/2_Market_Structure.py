@@ -100,15 +100,25 @@ if radar is None or radar.empty:
 st_label = {"naik": t("st_naik", lang), "pantau": t("st_pantau", lang),
             "tunggu": t("st_tunggu", lang)}
 order = {"naik": 0, "pantau": 1, "tunggu": 2}
-picked = st.multiselect(
-    t("sr_status_filter", lang),
-    [st_label[k] for k in ("naik", "pantau", "tunggu")],
-    default=[st_label["naik"], st_label["pantau"]],
-)
+
+# Filter by the latest signal (the code column), not by status. Real signals
+# in the order they matter; a "No signal" option lets flat names back in.
+no_signal = t("ms_no_signal", lang)
+signal_order = ["PANTAU", "BUY LOW (EMA20)", "BUY LOW (SMA200)", "SELL HIGH", "SL"]
+present = set(radar["code"])
+options = [c for c in signal_order if c in present]
+if (radar["code"] == "").any():
+    options.append(no_signal)
+picked = st.multiselect(t("ms_signal_filter", lang), options,
+                        default=[c for c in signal_order if c in present])
+
 r = radar.copy()
 r["_lbl"] = r["status"].map(st_label)
 if picked:
-    r = r[r["_lbl"].isin(picked)]
+    mask = r["code"].isin(picked)
+    if no_signal in picked:
+        mask = mask | (r["code"] == "")
+    r = r[mask]
 r = r.sort_values("status", key=lambda s: s.map(order))
 st.write(t("sr_screener_count", lang, n=len(r)))
 

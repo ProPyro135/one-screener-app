@@ -499,6 +499,8 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     },
     "ms_screener": {"en": "Radar — where each stock is now",
                     "id": "Radar — posisi tiap saham sekarang"},
+    "ms_signal_filter": {"en": "Filter by signal", "id": "Saring berdasarkan sinyal"},
+    "ms_no_signal": {"en": "No signal", "id": "Tanpa sinyal"},
 }
 
 
