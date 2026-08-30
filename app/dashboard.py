@@ -487,6 +487,7 @@ def render_detail(
     )
     st.caption(t("chart_controls", lang))
     st.caption(t("chart_price_note", lang))
+    st.caption(t("chart_fitted_note", lang))
     st.caption(t("chart_rsi_note", lang))
 
     with st.expander(t("raw_rows", lang)):

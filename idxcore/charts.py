@@ -658,13 +658,17 @@ def build_combined_figure(
             title_text="RSI", gridcolor=p["grid"], range=[0, 100],
             side="right", automargin=True, row=rsi_row, col=1,
         )
+    # The two lower panels are fits to the screenshots, not ports of a Pine
+    # script like the bands above (see indicators.py). The axis titles carry a
+    # "≈" and the UI spells it out, so they do not read as authoritatively as
+    # the price panel does.
     # The ribbon is a colour strip: no scale to read, so its y-axis is hidden.
     fig.update_yaxes(
-        title_text="Trend", showticklabels=False, range=[0, 1],
+        title_text="Trend ≈", showticklabels=False, range=[0, 1],
         side="right", automargin=True, row=ribbon_row, col=1,
     )
     fig.update_yaxes(
-        title_text="Cap.", gridcolor=p["grid"], range=[-3, 0.2],
+        title_text="Cap. ≈", gridcolor=p["grid"], range=[-3, 0.2],
         side="right", automargin=True, row=hist_row, col=1,
     )
 

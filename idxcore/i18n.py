@@ -458,6 +458,15 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
         "id": "Belum ada sinyal tersimpan. Jalankan `idxcore compute` setelah backfill.",
     },
 
+    "chart_fitted_note": {
+        "en": ("The two bottom panels (Trend ≈, Cap. ≈) are approximations fitted to "
+               "reference screenshots, not ported from a script like the bands above. "
+               "Read them as a rough guide, not as a measured signal."),
+        "id": ("Dua panel bawah (Trend ≈, Cap. ≈) adalah perkiraan yang dicocokkan ke "
+               "screenshot acuan, bukan hasil port skrip seperti pita di atasnya. "
+               "Baca sebagai panduan kasar, bukan sinyal terukur."),
+    },
+
     # ---- search page ----
     "sr_title": {"en": "Search a saham", "id": "Cari saham"},
     "sr_caption": {
