@@ -123,7 +123,7 @@ if signals is None or signals.empty:
 @st.cache_data(ttl=300, show_spinner="Menghitung radar…")
 def _radar():
     with _connection() as con:
-        return None if con is None else bf.radar_screen(con, lookback=5)
+        return None if con is None else bf.radar_screen(con)  # last signal ever
 
 
 st.subheader(t("sr_screener", lang))
@@ -142,10 +142,25 @@ if radar is not None and not radar.empty:
         [st_label[k] for k in ("naik", "bottom", "tunggu")],
         default=[st_label["naik"], st_label["bottom"]],
     )
+    # Second filter, on the signal itself: "show me every BUY (a2)" is a
+    # different question from "show me everything armed". Options come from
+    # REASON_MAP so the list cannot drift from the state machine's codes.
+    no_signal = t("ms_no_signal", lang)
+    present = set(radar["code"])
+    sig_options = [c for c in bf.REASON_MAP if c in present]
+    if (radar["code"] == "").any():
+        sig_options.append(no_signal)
+    picked_sig = st.multiselect(t("ms_signal_filter", lang), sig_options)
+
     r = radar.copy()
     r["_lbl"] = r["status"].map(st_label)
     if picked:
         r = r[r["_lbl"].isin(picked)]
+    if picked_sig:
+        mask = r["code"].isin(picked_sig)
+        if no_signal in picked_sig:
+            mask = mask | (r["code"] == "")
+        r = r[mask]
     r = r.sort_values("status", key=lambda s: s.map(order))
     st.write(t("sr_screener_count", lang, n=len(r)))
 
@@ -220,3 +235,4 @@ st.plotly_chart(
     use_container_width=True, config=PLOTLY_CONFIG,
 )
 st.caption(t("chart_price_note", lang))
+st.caption(t("chart_fitted_note", lang))

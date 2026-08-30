@@ -304,7 +304,8 @@ def screen(
             continue
         codes, _, _ = run_state_machine(prepare(g))
         n = len(codes)
-        j = next((k for k in range(n - 1, max(-1, n - 1 - lookback), -1) if codes[k]), None)
+        stop = -1 if lookback is None else max(-1, n - 1 - lookback)
+        j = next((k for k in range(n - 1, stop, -1) if codes[k]), None)
         if j is None:
             continue
         idx_code, name = meta.get(ticker, (ticker, None))
@@ -338,12 +339,13 @@ def radar_screen(
     con: duckdb.DuckDBPyConnection,
     *,
     tickers: Optional[list[str]] = None,
-    lookback: int = 5,
+    lookback: Optional[int] = None,
 ) -> pd.DataFrame:
     """Every active ticker's current Bottom Fishing state, for the screener table.
 
-    ``status`` is the radar (naik / bottom / tunggu); ``code`` is the most recent
-    signal within ``lookback`` bars (blank if none). ``close`` is the latest price.
+    ``status`` is the radar (naik / bottom / tunggu); ``code`` is the last signal
+    the ticker fired — the most recent within ``lookback`` bars, or the last one
+    ever when ``lookback`` is None. ``close`` is the latest price.
     """
     bars = _all_bars(con, tickers)
     meta = _ticker_meta(con)
@@ -354,7 +356,8 @@ def radar_screen(
         codes, _, lines = run_state_machine(prepare(g))
         n = len(codes)
         status = _status(lines["position"][-1], lines["setup"][-1])
-        j = next((k for k in range(n - 1, max(-1, n - 1 - lookback), -1) if codes[k]), None)
+        stop = -1 if lookback is None else max(-1, n - 1 - lookback)
+        j = next((k for k in range(n - 1, stop, -1) if codes[k]), None)
         code = codes[j] if j is not None else ""
         idx_code, name = meta.get(ticker, (ticker, None))
         rows.append({
