@@ -467,6 +467,54 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
                "Baca sebagai panduan kasar, bukan sinyal terukur."),
     },
 
+    # ---- trade log table (both screeners) ----
+    "tl_status": {"en": "Status", "id": "Status"},
+    "tl_buy_date": {"en": "BUY (date)", "id": "BUY (tgl)"},
+    "tl_pb": {"en": "P/B", "id": "P/B"},
+    "tl_buy_price": {"en": "BUY Price", "id": "Harga BUY"},
+    "tl_last": {"en": "Price today", "id": "Harga hari ini"},
+    "tl_fl": {"en": "% FL", "id": "% FL"},
+    "tl_hi": {"en": "Hi Price", "id": "Hi Price"},
+    "tl_max_fl": {"en": "Max % FL", "id": "Max % FL"},
+    "tl_exit_date": {"en": "TP/CL (date)", "id": "TP/CL (tgl)"},
+    "tl_exit_price": {"en": "TP/CL Price", "id": "Harga TP/CL"},
+    "tl_pl": {"en": "% P&L (close)", "id": "% P&L (close)"},
+    "tl_entry_code": {"en": "Entry signal", "id": "Sinyal masuk"},
+    "tl_exit_code": {"en": "Exit signal", "id": "Sinyal keluar"},
+    "tl_turnover": {"en": "Turnover/day", "id": "Nilai transaksi/hari"},
+
+    "tl_f_dates": {"en": "BUY date between", "id": "Tanggal BUY antara"},
+    "tl_f_status": {"en": "Status", "id": "Status"},
+    "tl_f_signal": {"en": "Entry signal", "id": "Sinyal masuk"},
+    "tl_f_sleepy": {
+        "en": "Skip sleepy stocks (turnover under Rp100 m/day)",
+        "id": "Lewati saham tidur (nilai transaksi di bawah Rp100 jt/hari)",
+    },
+    "tl_count": {"en": "**{n}** stock(s) shown, newest BUY first.",
+                 "id": "**{n}** saham ditampilkan, BUY terbaru di atas."},
+    "tl_pick": {"en": "Click a row to see that stock's full trade history.",
+                "id": "Klik satu baris untuk melihat seluruh riwayat trade-nya."},
+    "tl_history": {"en": "Trade history — {name}", "id": "Riwayat trade — {name}"},
+    "tl_gross": {
+        "en": ("Returns are gross: no brokerage fee is applied, because the rates on "
+               "file are assumed rather than taken from a real confirmation. % FL is "
+               "floating on an open position, % P&L is realised on a closed one."),
+        "id": ("Return bersifat bruto: fee broker belum dipotong, karena tarif yang "
+               "tersimpan masih asumsi dan bukan dari konfirmasi transaksi asli. % FL "
+               "adalah floating pada posisi terbuka, % P&L adalah hasil yang sudah "
+               "terealisasi pada posisi tertutup."),
+    },
+    "tl_legend": {
+        "en": ("OPEN = bought, no TP/CL yet · WATCHLIST = setup armed, nothing bought "
+               "(marked P) · CLOSED = exited on a take-profit · EXIT = exited on a "
+               "cut-loss."),
+        "id": ("OPEN = sudah beli, belum ada TP/CL · WATCHLIST = setup siap, belum "
+               "beli (ditandai P) · CLOSED = keluar lewat take-profit · EXIT = keluar "
+               "lewat cut-loss."),
+    },
+    "tl_empty": {"en": "No stock matches these filters.",
+                 "id": "Tidak ada saham yang cocok dengan saringan ini."},
+
     # ---- search page ----
     "sr_title": {"en": "Search a saham", "id": "Cari saham"},
     "sr_caption": {
@@ -485,16 +533,7 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     # ---- search-page radar screener ----
     "sr_screener": {"en": "Radar — where each stock is now",
                     "id": "Radar — posisi tiap saham sekarang"},
-    "sr_screener_count": {"en": "**{n}** stock(s) shown.", "id": "**{n}** saham ditampilkan."},
-    "sr_status_filter": {"en": "Filter by status", "id": "Saring berdasarkan status"},
-    "sr_status": {"en": "Status", "id": "Status"},
-    "sr_signal": {"en": "Latest signal", "id": "Sinyal terakhir"},
-    "sr_reason": {"en": "Reason", "id": "Alasan"},
     "sr_lookup": {"en": "Look up one stock", "id": "Cari satu saham"},
-    "st_naik": {"en": "RISING", "id": "LAGI NAIK"},
-    "st_bottom": {"en": "WATCH (BOTTOM)", "id": "PANTAU (BOTTOM)"},
-    "st_tunggu": {"en": "WAIT", "id": "TUNGGU"},
-    "st_pantau": {"en": "WATCH (PULLBACK)", "id": "PANTAU (PULLBACK)"},
     "ms_title": {"en": "Market Structure", "id": "Market Structure"},
     "ms_caption": {
         "en": ("A second screener. Auto-switching regime (EMA20 in a volatile "
@@ -508,8 +547,6 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     },
     "ms_screener": {"en": "Radar — where each stock is now",
                     "id": "Radar — posisi tiap saham sekarang"},
-    "ms_signal_filter": {"en": "Filter by signal", "id": "Saring berdasarkan sinyal"},
-    "ms_no_signal": {"en": "No signal", "id": "Tanpa sinyal"},
 }
 
 

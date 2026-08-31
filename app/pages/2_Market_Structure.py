@@ -19,8 +19,11 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import trade_table  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
+from idxcore.compute import trade_log as tl  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db  # noqa: E402
 
@@ -80,65 +83,23 @@ st.title(f"🏗️ {t('ms_title', lang)}")
 st.caption(t("ms_caption", lang))
 
 
-@st.cache_data(ttl=300, show_spinner="Menghitung radar…")
-def _radar():
+# The build walks every ticker's bars through the state machine — ~22s — and the
+# store only changes once a trading day, so the short radar TTL was wasteful.
+@st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
+def _log():
     with _connection() as con:
-        return None if con is None else ms.radar_screen(con)  # last signal ever
+        return None if con is None else tl.build(con, ms)
 
 
 st.subheader(t("ms_screener", lang))
 try:
-    radar = _radar()
+    log = _log()
 except StoreBusy:
     st.info(t("store_busy", lang), icon="⏳")
     st.stop()
 
-if radar is None or radar.empty:
+if log is None or log.empty:
     st.error(t("no_store", lang, path=DB_PATH))
     st.stop()
 
-st_label = {"naik": t("st_naik", lang), "pantau": t("st_pantau", lang),
-            "tunggu": t("st_tunggu", lang)}
-order = {"naik": 0, "pantau": 1, "tunggu": 2}
-
-# Filter by the latest signal (the code column), not by status. Real signals
-# in the order they matter; a "No signal" option lets flat names back in.
-no_signal = t("ms_no_signal", lang)
-signal_order = ["PANTAU", "BUY LOW (EMA20)", "BUY LOW (SMA200)", "SELL HIGH", "SL"]
-present = set(radar["code"])
-options = [c for c in signal_order if c in present]
-if (radar["code"] == "").any():
-    options.append(no_signal)
-picked = st.multiselect(t("ms_signal_filter", lang), options,
-                        default=[c for c in signal_order if c in present])
-
-r = radar.copy()
-r["_lbl"] = r["status"].map(st_label)
-if picked:
-    mask = r["code"].isin(picked)
-    if no_signal in picked:
-        mask = mask | (r["code"] == "")
-    r = r[mask]
-r = r.sort_values("status", key=lambda s: s.map(order))
-st.write(t("sr_screener_count", lang, n=len(r)))
-
-tbl = pd.DataFrame({
-    t("c_ticker", lang): r["idx_code"].fillna(r["ticker"]),
-    t("c_name", lang): r["name"],
-    t("c_close", lang): r["close"],
-    t("sr_status", lang): r["_lbl"],
-    t("sr_signal", lang): r["code"],
-    t("sr_reason", lang): r["reason"],
-})
-palette = {st_label[k]: ms.STATUS_COLOUR[k] for k in st_label}
-
-
-def _paint(v):
-    colour = palette.get(v)
-    return f"background-color: {colour}; color: white; font-weight: 600" if colour else ""
-
-
-styled = (tbl.style
-          .map(_paint, subset=[t("sr_status", lang)])
-          .format({t("c_close", lang): "{:,.0f}"}))
-st.dataframe(styled, use_container_width=True, hide_index=True)
+trade_table.render(log, lang, key="ms")

@@ -18,9 +18,12 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from idxcore.charts import PLOTLY_CONFIG, build_combined_figure  # noqa: E402
+import trade_table  # noqa: E402
 from idxcore.compute import bottom_fishing as bf  # noqa: E402
+from idxcore.compute import trade_log as tl  # noqa: E402
 from idxcore.compute.signals import render_criteria  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db, read  # noqa: E402
@@ -117,71 +120,26 @@ if signals is None or signals.empty:
     st.stop()
 
 # ---------------------------------------------------------------------------
-# radar screener — each stock's current Bottom Fishing state, colour-coded
+# trade log — every Bottom Fishing BUY through to its TP/CL, newest first
 # ---------------------------------------------------------------------------
 
-@st.cache_data(ttl=300, show_spinner="Menghitung radar…")
-def _radar():
+# ~25s to walk every ticker through the state machine, against a store that
+# changes once a trading day, so the cache is held for an hour rather than 5min.
+@st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
+def _log():
     with _connection() as con:
-        return None if con is None else bf.radar_screen(con)  # last signal ever
+        return None if con is None else tl.build(con, bf)
 
 
 st.subheader(t("sr_screener", lang))
 try:
-    radar = _radar()
+    log = _log()
 except StoreBusy:
-    radar = None
+    log = None
     st.info(t("store_busy", lang), icon="⏳")
 
-if radar is not None and not radar.empty:
-    st_label = {"naik": t("st_naik", lang), "bottom": t("st_bottom", lang),
-                "tunggu": t("st_tunggu", lang)}
-    order = {"naik": 0, "bottom": 1, "tunggu": 2}
-    picked = st.multiselect(
-        t("sr_status_filter", lang),
-        [st_label[k] for k in ("naik", "bottom", "tunggu")],
-        default=[st_label["naik"], st_label["bottom"]],
-    )
-    # Second filter, on the signal itself: "show me every BUY (a2)" is a
-    # different question from "show me everything armed". Options come from
-    # REASON_MAP so the list cannot drift from the state machine's codes.
-    no_signal = t("ms_no_signal", lang)
-    present = set(radar["code"])
-    sig_options = [c for c in bf.REASON_MAP if c in present]
-    if (radar["code"] == "").any():
-        sig_options.append(no_signal)
-    picked_sig = st.multiselect(t("ms_signal_filter", lang), sig_options)
-
-    r = radar.copy()
-    r["_lbl"] = r["status"].map(st_label)
-    if picked:
-        r = r[r["_lbl"].isin(picked)]
-    if picked_sig:
-        mask = r["code"].isin(picked_sig)
-        if no_signal in picked_sig:
-            mask = mask | (r["code"] == "")
-        r = r[mask]
-    r = r.sort_values("status", key=lambda s: s.map(order))
-    st.write(t("sr_screener_count", lang, n=len(r)))
-
-    tbl = pd.DataFrame({
-        t("c_ticker", lang): r["idx_code"].fillna(r["ticker"]),
-        t("c_name", lang): r["name"],
-        t("c_close", lang): r["close"],
-        t("sr_status", lang): r["_lbl"],
-        t("sr_signal", lang): r["code"],
-        t("sr_reason", lang): r["reason"],
-    })
-    palette = {st_label[k]: bf.STATUS_COLOUR[k] for k in st_label}
-
-    def _paint(v):
-        colour = palette.get(v)
-        return f"background-color: {colour}; color: white; font-weight: 600" if colour else ""
-
-    styled = (tbl.style
-              .map(_paint, subset=[t("sr_status", lang)])
-              .format({t("c_close", lang): "{:,.0f}"}))
-    st.dataframe(styled, use_container_width=True, hide_index=True)
+if log is not None and not log.empty:
+    trade_table.render(log, lang, key="bf")
 
 st.divider()
 st.subheader(f"🔎 {t('sr_lookup', lang)}")
