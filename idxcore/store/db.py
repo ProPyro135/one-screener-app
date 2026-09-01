@@ -35,6 +35,10 @@ DEFAULT_DB_PATH = Path("data") / "idx.duckdb"
 #: downloads it once per boot; a fresh deploy (triggered by the daily marker
 #: commit) always pulls the latest.
 SLIM_STORE_PATH = Path("data") / "idx_slim.duckdb"
+#: Committed by scripts/publish_slim.ps1 on every publish. Its change is what
+#: triggers the redeploy, and it is also how a container tells whether the copy
+#: it already downloaded is the one currently published.
+SLIM_VERSION_MARKER = Path("data") / "slim_version.txt"
 SLIM_STORE_URL = os.environ.get(
     "SLIM_STORE_URL",
     "https://github.com/ProPyro135/one-screener-app/releases/download/"
@@ -42,21 +46,47 @@ SLIM_STORE_URL = os.environ.get(
 )
 
 
-def ensure_slim_store(path: Path = SLIM_STORE_PATH, url: str = SLIM_STORE_URL) -> Path:
-    """Local slim store, downloading it from the Release asset if it is absent.
+def _read_marker(path: Path) -> str:
+    # The marker is written by PowerShell, so it carries a UTF-8 BOM.
+    try:
+        return path.read_text(encoding="utf-8-sig").strip()
+    except OSError:
+        return ""
 
-    On the host the file does not exist on a fresh container, so it is fetched
-    once. Locally (developer machine) the full store is used instead and this is
-    never called, so no download happens.
+
+def ensure_slim_store(
+    path: Path = SLIM_STORE_PATH,
+    url: str = SLIM_STORE_URL,
+    marker: Path = SLIM_VERSION_MARKER,
+) -> Path:
+    """Local slim store, re-downloading it whenever it is not the published one.
+
+    Checking only for the file's *existence* was not enough. A redeploy does not
+    always get a fresh container: Streamlit will re-run the script against a
+    container that already has the file, and the old code then served that stale
+    copy forever — the app sat on 2026-08-31 data for a day after 2026-09-01 was
+    published, with the new code deployed around it.
+
+    So the version the local file was fetched at is recorded beside it and
+    compared against the committed marker, which the redeploy always brings in
+    fresh. A missing stamp counts as a mismatch, which is what lets an already
+    stale container heal itself.
+
+    Locally the full store is used instead and this is never called.
     """
-    if path.exists() and path.stat().st_size > 0:
+    want = _read_marker(marker)
+    stamp = path.with_suffix(".version")
+    have = _read_marker(stamp)
+    if path.exists() and path.stat().st_size > 0 and have == want and want:
         return path
+
     import urllib.request
 
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".part")
     urllib.request.urlretrieve(url, tmp)  # noqa: S310 - fixed GitHub Release URL
     tmp.replace(path)
+    stamp.write_text(want, encoding="utf-8")
     return path
 
 INGEST_STATUSES = frozenset({
@@ -506,3 +536,49 @@ def latest_run_id(con: duckdb.DuckDBPyConnection, source: Optional[str] = None) 
             [source],
         ).fetchone()
     return row[0] if row else None
+
+
+def _self_check() -> None:
+    """The slim-store freshness rule, in the four states that matter.
+
+    Existence alone was the original test and it is what let a reused container
+    serve 2026-08-31 data for a day after 2026-09-01 was published.
+    """
+    import tempfile
+    import urllib.request
+
+    calls: list[str] = []
+    real = urllib.request.urlretrieve
+
+    def fake(url, out):  # noqa: ANN001
+        calls.append(url)
+        Path(out).write_bytes(b"NEW")
+
+    urllib.request.urlretrieve = fake
+    try:
+        d = Path(tempfile.mkdtemp())
+        store, marker = d / "idx_slim.duckdb", d / "slim_version.txt"
+        marker.write_text("\ufeff2026-09-01\n", encoding="utf-8")  # PowerShell writes a BOM
+
+        ensure_slim_store(store, "u", marker)
+        assert len(calls) == 1, "a fresh container must download"
+        ensure_slim_store(store, "u", marker)
+        assert len(calls) == 1, "same version must not re-download"
+
+        store.write_bytes(b"OLD")
+        store.with_suffix(".version").unlink()
+        ensure_slim_store(store, "u", marker)
+        assert len(calls) == 2, "a file with no stamp must be treated as stale"
+
+        marker.write_text("\ufeff2026-09-02\n", encoding="utf-8")
+        store.write_bytes(b"OLD")
+        ensure_slim_store(store, "u", marker)
+        assert len(calls) == 3, "a newer published version must re-download"
+        assert store.read_bytes() == b"NEW"
+    finally:
+        urllib.request.urlretrieve = real
+    print("ensure_slim_store self-check OK")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    _self_check()

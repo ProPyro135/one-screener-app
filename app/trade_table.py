@@ -101,15 +101,18 @@ def _style(frame: pd.DataFrame, lang: str):
             return ""
         return "color: #2E7D32; font-weight: 600" if v >= 0 else "color: #C62828; font-weight: 600"
 
+    # One format() call, not four. Styler.format() with no `subset` applies to
+    # every column, so a second call resets the first call's formatters back to
+    # the default — chaining them left prices as 92.000000 and dates as
+    # 2026-08-31 00:00:00 on the live site while the colours worked fine.
+    fmt = {c: "{:,.0f}" for c in price_cols}
+    fmt.update({c: "{:+.2f}%" for c in pct_cols})
+    fmt[t("tl_buy_date", lang)] = "{:%d/%m/%Y}"
+    fmt[t("tl_exit_date", lang)] = "{:%d/%m/%Y}"
     return (out.style
             .map(paint_status, subset=[t("tl_status", lang)])
             .map(paint_pct, subset=pct_cols)
-            .format({c: "{:,.0f}" for c in price_cols}, na_rep="—")
-            .format({c: "{:+.2f}%" for c in pct_cols}, na_rep="—")
-            .format({t("tl_buy_date", lang): "{:%d/%m/%Y}",
-                     t("tl_exit_date", lang): "{:%d/%m/%Y}"}, na_rep="—")
-            .format({t("tl_entry_code", lang): "{}", t("tl_exit_code", lang): "{}"},
-                    na_rep="—"))
+            .format(fmt, na_rep="—"))
 
 
 def render(log: pd.DataFrame, lang: str, *, key: str) -> None:

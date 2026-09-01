@@ -10,3 +10,5 @@ __pycache__/
 # triggers a redeploy. See idxcore/store/db.ensure_slim_store + scripts/publish_slim.ps1.
 data/idx_slim.duckdb
 data/*.part
+data/*.version
+.gstack/

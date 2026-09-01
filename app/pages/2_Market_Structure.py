@@ -86,14 +86,14 @@ st.caption(t("ms_caption", lang))
 # The build walks every ticker's bars through the state machine — ~22s — and the
 # store only changes once a trading day, so the short radar TTL was wasteful.
 @st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
-def _log():
+def _log(version: str):
     with _connection() as con:
         return None if con is None else tl.build(con, ms)
 
 
 st.subheader(t("ms_screener", lang))
 try:
-    log = _log()
+    log = _log(db._read_marker(db.SLIM_VERSION_MARKER))
 except StoreBusy:
     st.info(t("store_busy", lang), icon="⏳")
     st.stop()

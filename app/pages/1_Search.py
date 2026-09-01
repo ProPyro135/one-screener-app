@@ -126,14 +126,14 @@ if signals is None or signals.empty:
 # ~25s to walk every ticker through the state machine, against a store that
 # changes once a trading day, so the cache is held for an hour rather than 5min.
 @st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
-def _log():
+def _log(version: str):
     with _connection() as con:
         return None if con is None else tl.build(con, bf)
 
 
 st.subheader(t("sr_screener", lang))
 try:
-    log = _log()
+    log = _log(db._read_marker(db.SLIM_VERSION_MARKER))
 except StoreBusy:
     log = None
     st.info(t("store_busy", lang), icon="⏳")
