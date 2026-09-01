@@ -125,6 +125,20 @@ if signals is None or signals.empty:
 
 # ~25s to walk every ticker through the state machine, against a store that
 # changes once a trading day, so the cache is held for an hour rather than 5min.
+def _data_version() -> str:
+    """The published slim-store version, read here rather than from idxcore.
+
+    Deliberately not `db._read_marker`: a Streamlit redeploy is often a hot
+    reload that re-runs this script against already-imported modules, so any
+    newly added attribute of `idxcore.store.db` is missing until a real reboot
+    and the page dies with an AttributeError. Page code is always fresh.
+    """
+    try:
+        return (Path("data") / "slim_version.txt").read_text(encoding="utf-8-sig").strip()
+    except OSError:
+        return ""
+
+
 @st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
 def _log(version: str):
     with _connection() as con:
@@ -133,7 +147,7 @@ def _log(version: str):
 
 st.subheader(t("sr_screener", lang))
 try:
-    log = _log(db._read_marker(db.SLIM_VERSION_MARKER))
+    log = _log(_data_version())
 except StoreBusy:
     log = None
     st.info(t("store_busy", lang), icon="⏳")
