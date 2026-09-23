@@ -130,8 +130,8 @@ mod, table_key, caption = STRATEGIES[pick]
 st.caption(caption.get(lang, caption["en"]))
 
 
-# The build walks every ticker's bars through the state machine — ~22s — and the
-# store only changes once a trading day, so the short radar TTL was wasteful.
+# The trade log is read once per published data version; the store only
+# changes once a trading day, so an hour-long cache costs nothing.
 def _data_version() -> str:
     """The published slim-store version, read here rather than from idxcore.
 
@@ -149,10 +149,26 @@ def _data_version() -> str:
 @st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
 def _log(version: str, pick: str):
     with _connection() as con:
-        return None if con is None else tl.build(con, STRATEGIES[pick][0])
+        if con is None:
+            return None
+        # The nightly publish precomputes every trade over the full ten years
+        # (trade_log.publish). Reading it is instant; walking the bars here
+        # would only see the slim store's ~180 bars and would lag the page.
+        # The table name is spelled out rather than read from trade_log, so a
+        # hot reload that keeps an older trade_log in memory cannot break this.
+        cached = con.execute(
+            "SELECT count(*) FROM information_schema.tables "
+            "WHERE table_name = 'trade_log_cache'"
+        ).fetchone()[0]
+        if cached:
+            return con.execute(
+                "SELECT * EXCLUDE (strategy, seq) FROM trade_log_cache "
+                "WHERE strategy = ? ORDER BY seq",
+                [pick],
+            ).df()
+        return tl.build(con, STRATEGIES[pick][0])
 
 
-st.subheader(t("ms_screener", lang))
 try:
     log = _log(_data_version(), pick)
 except StoreBusy:

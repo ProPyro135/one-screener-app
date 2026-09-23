@@ -190,7 +190,54 @@ def _self_check(db_path: str) -> None:
     print("trade_log self-check OK")
 
 
+#: Table the nightly publish writes into the slim store (see ``publish``).
+CACHE_TABLE = "trade_log_cache"
+
+
+def publish(full_path: str, slim_path: str) -> int:
+    """Write every trade of every Pine strategy, over the FULL history, into
+    the slim store as ``trade_log_cache``.
+
+    The hosted app only carries the last ~180 bars, too short for a backtest
+    and too short for the strategies to warm up; walking ten years per request
+    would also lag the page. So the nightly job computes the log here, against
+    the full store, and the page just reads the finished rows.
+
+    Every ticker is walked, delisted ones too — a backtest must not drop the
+    names that failed. ``is_active`` travels with each row so the current-
+    status view can still hide them.
+    """
+    from idxcore.compute import market_structure, pullback_sniper, reversal_sniper
+
+    strategies = {"A": market_structure, "B": reversal_sniper, "C": pullback_sniper}
+    full = duckdb.connect(full_path, read_only=True)
+    try:
+        active = dict(full.execute("SELECT ticker, is_active FROM tickers").fetchall())
+        frames = [
+            build(full, mod, tickers=list(active)).assign(strategy=key)
+            for key, mod in strategies.items()
+        ]
+    finally:
+        full.close()
+    log = pd.concat(frames, ignore_index=True)
+    log["is_active"] = log["ticker"].map(active).fillna(False).astype(bool)
+    # latest() relies on row order (chronological, watchlist last); SQL does
+    # not promise it back, so it travels as a column.
+    log["seq"] = range(len(log))
+
+    slim = duckdb.connect(slim_path)
+    try:
+        slim.register("log_df", log)
+        slim.execute(f"CREATE OR REPLACE TABLE {CACHE_TABLE} AS SELECT * FROM log_df")
+    finally:
+        slim.close()
+    return len(log)
+
+
 if __name__ == "__main__":  # pragma: no cover
     import sys
 
-    _self_check(sys.argv[1] if len(sys.argv) > 1 else "data/idx_slim.duckdb")
+    if len(sys.argv) == 4 and sys.argv[1] == "--publish":
+        print(f"{CACHE_TABLE}: {publish(sys.argv[2], sys.argv[3])} rows written")
+    else:
+        _self_check(sys.argv[1] if len(sys.argv) > 1 else "data/idx_slim.duckdb")

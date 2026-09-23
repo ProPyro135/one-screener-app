@@ -28,6 +28,8 @@ STATUS_ORDER = [tl.OPEN, tl.WATCHLIST, tl.CLOSED, tl.EXIT]
 PERIODS = {
     "1w": pd.DateOffset(weeks=1), "1m": pd.DateOffset(months=1),
     "3m": pd.DateOffset(months=3), "6m": pd.DateOffset(months=6),
+    "1y": pd.DateOffset(years=1), "3y": pd.DateOffset(years=3),
+    "5y": pd.DateOffset(years=5),
     "all": None, "custom": None,
 }
 #: Labels kept here, not in idxcore/i18n.py: a Streamlit hot reload re-imports
@@ -35,19 +37,43 @@ PERIODS = {
 #: until someone reboots the app.
 PERIOD_TITLE = "PERIOD"
 PERIOD_LABELS = {
-    "en": {"1w": "1W", "1m": "1M", "3m": "3M", "6m": "6M", "all": "All", "custom": "Custom"},
-    "id": {"1w": "1 Mgg", "1m": "1 Bln", "3m": "3 Bln", "6m": "6 Bln", "all": "Semua",
-           "custom": "Custom"},
+    "en": {"1w": "1W", "1m": "1M", "3m": "3M", "6m": "6M", "1y": "1Y", "3y": "3Y",
+           "5y": "5Y", "all": "All", "custom": "Custom"},
+    "id": {"1w": "1 Mgg", "1m": "1 Bln", "3m": "3 Bln", "6m": "6 Bln", "1y": "1 Thn",
+           "3y": "3 Thn", "5y": "5 Thn", "all": "Semua", "custom": "Custom"},
+}
+#: The backtest view lists at most this many trades, newest first. Styling tens
+#: of thousands of rows would lag the page; the summary still counts them all.
+MAX_ROWS = 500
+TEXT = {
+    "en": {"view": "VIEW", "now": "Current positions", "bt": "Backtest",
+           "trades": "Trades", "tp": "TP", "cl": "CL", "open": "Still open",
+           "win": "Win rate", "avg": "Average P&L", "median": "Median P&L",
+           "none": "No closed trade in this selection.",
+           "note": ("Measured on every trade in the selection, bought from {first} to "
+                    "{last}. Gross: broker fees are not deducted. Win rate and P&L count "
+                    "closed trades only (TP + CL). The sleepy-stock filter uses today's "
+                    "turnover, not the turnover at the time of the trade."),
+           "capped": "Showing the newest {shown:,} of {total:,} trades; the summary above counts all of them."},
+    "id": {"view": "TAMPILAN", "now": "Posisi terkini", "bt": "Backtest",
+           "trades": "Trade", "tp": "TP", "cl": "CL", "open": "Masih open",
+           "win": "Win rate", "avg": "Rata-rata P&L", "median": "Median P&L",
+           "none": "Tidak ada trade yang sudah selesai di pilihan ini.",
+           "note": ("Diukur dari semua trade di pilihan ini, BUY dari {first} sampai "
+                    "{last}. Bruto: fee broker belum dipotong. Win rate dan P&L hanya "
+                    "menghitung trade yang sudah selesai (TP + CL). Filter saham tidur "
+                    "memakai nilai transaksi hari ini, bukan saat trade terjadi."),
+           "capped": "Menampilkan {shown:,} trade terbaru dari {total:,}; ringkasan di atas menghitung semuanya."},
 }
 
 
-def _filters(cur: pd.DataFrame, lang: str, key: str) -> pd.DataFrame:
-    """The filters, applied to the one-row-per-ticker view."""
+def _filters(cur: pd.DataFrame, lang: str, key: str, default: str = "all") -> pd.DataFrame:
+    """PERIOD, status and sleepy filters over whichever rows are passed in."""
     dates = pd.to_datetime(cur["buy_date"]).dropna()
     # One click for the usual windows; the range calendar only for Custom. Its
-    # own row, so all six buttons fit on one line.
+    # own row, so all the buttons fit on one line.
     period = st.segmented_control(
-        PERIOD_TITLE, list(PERIODS), default="all",
+        PERIOD_TITLE, list(PERIODS), default=default,
         format_func=lambda p: PERIOD_LABELS.get(lang, PERIOD_LABELS["en"])[p],
         key=f"{key}_period",
     )
@@ -135,9 +161,53 @@ def _style(frame: pd.DataFrame, lang: str):
             .format(fmt, na_rep="—"))
 
 
+def _backtest(log: pd.DataFrame, lang: str, key: str) -> None:
+    """Every trade bought in the period, a measured summary, and the newest rows."""
+    tx = TEXT.get(lang, TEXT["en"])
+    # Delisted names stay in: a backtest that drops the failures flatters itself.
+    r = _filters(log[log["status"] != tl.WATCHLIST], lang, f"{key}_bt", default="1y")
+    r = r.sort_values("buy_date", ascending=False)
+    done = r[r["status"].isin([tl.CLOSED, tl.EXIT])]
+    pl = done["pl_pct"]
+
+    c = st.columns(6)
+    c[0].metric(tx["trades"], f"{len(r):,}")
+    c[1].metric(tx["tp"], f"{(done['status'] == tl.CLOSED).sum():,}")
+    c[2].metric(tx["cl"], f"{(done['status'] == tl.EXIT).sum():,}")
+    c[3].metric(tx["win"], f"{(pl > 0).mean() * 100:.1f}%" if len(pl) else "—")
+    c[4].metric(tx["avg"], f"{pl.mean():+.2f}%" if len(pl) else "—")
+    c[5].metric(tx["median"], f"{pl.median():+.2f}%" if len(pl) else "—")
+    if r.empty:
+        st.info(tx["none"])
+        return
+    bd = pd.to_datetime(r["buy_date"])
+    st.caption(f"{tx['open']}: {(r['status'] == tl.OPEN).sum():,} · "
+               + tx["note"].format(first=f"{bd.min():%d/%m/%Y}", last=f"{bd.max():%d/%m/%Y}"))
+    if done.empty:
+        st.info(tx["none"])
+
+    st.dataframe(_style(r.head(MAX_ROWS), lang), use_container_width=True,
+                 hide_index=True, placeholder="—")
+    if len(r) > MAX_ROWS:
+        st.caption(tx["capped"].format(shown=MAX_ROWS, total=len(r)))
+    st.caption(t("tl_legend", lang))
+
+
 def render(log: pd.DataFrame, lang: str, *, key: str) -> None:
-    """Filters, the one-row-per-ticker table, and one ticker's history on click."""
+    """Current positions (one row per ticker, history on click) or the backtest."""
+    tx = TEXT.get(lang, TEXT["en"])
+    mode = st.segmented_control(
+        tx["view"], ["now", "bt"], default="now",
+        format_func=lambda m: tx[m], key=f"{key}_mode",
+    ) or "now"
+    if mode == "bt":
+        _backtest(log, lang, key)
+        return
+
     cur = tl.latest(log)
+    if "is_active" in cur.columns:
+        # Where each stock stands today only makes sense for listed stocks.
+        cur = cur[cur["is_active"]]
     r = _filters(cur, lang, key)
     # Newest entry first — the whole point of adding the date. Watchlist rows
     # have no BUY date and sort to the bottom.

@@ -528,9 +528,6 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
         "id": "Kriteria: {crit}  ·  Papan: {board}  ·  Sektor: {sector}",
     },
 
-    # ---- search-page radar screener ----
-    "ms_screener": {"en": "Radar — where each stock is now",
-                    "id": "Radar — posisi tiap saham sekarang"},
 }
 
 
