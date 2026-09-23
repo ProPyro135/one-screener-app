@@ -1,6 +1,7 @@
 """Strategi — the owner's Pine Script strategies, one trade table.
 
-Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper) and the
+Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
+Pullback Sniper) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -22,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import trade_table  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
+from idxcore.compute import pullback_sniper as ps  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
 from idxcore.compute import trade_log as tl  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
@@ -54,6 +56,18 @@ STRATEGIES = {
                "turun ke bawah MA20 lalu close kembali di atasnya (BUY Re-Entry). TP "
                "saat close pertama di bawah MA5 setelah reli, hanya kalau di atas "
                "harga beli. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+    "C": (ps, "ps", {
+        "en": ("Pullback Sniper. In an uptrend (Bollinger mid rising over 10 days), a "
+               "green bar under the mid that closes above the previous close and "
+               "SMA5. TP above the buy price when price is over the mid but back "
+               "under SMA5, or tags the upper band on a red bar. CL at the 7-day "
+               "low, at most -10%. Monitoring, not a proven signal."),
+        "id": ("Pullback Sniper. Saat tren naik (MA20 lebih tinggi dari 10 hari lalu), "
+               "candle hijau di bawah MA20 yang close di atas close kemarin dan "
+               "SMA5. TP di atas harga beli saat harga di atas MA20 tapi kembali di "
+               "bawah SMA5, atau menyentuh upper band dengan candle merah. CL di "
+               "low 7 hari, maksimal -10%. Ini pemantauan, bukan sinyal terbukti."),
     }),
 }
 
