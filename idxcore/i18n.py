@@ -483,13 +483,6 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     "tl_exit_code": {"en": "Exit signal", "id": "Sinyal keluar"},
     "tl_turnover": {"en": "Turnover/day", "id": "Nilai transaksi/hari"},
 
-    "tl_f_dates": {"en": "PERIOD", "id": "PERIOD"},
-    "tl_p_1w": {"en": "1W", "id": "1 Mgg"},
-    "tl_p_1m": {"en": "1M", "id": "1 Bln"},
-    "tl_p_3m": {"en": "3M", "id": "3 Bln"},
-    "tl_p_6m": {"en": "6M", "id": "6 Bln"},
-    "tl_p_all": {"en": "All", "id": "Semua"},
-    "tl_p_custom": {"en": "Custom", "id": "Custom"},
     "tl_f_status": {"en": "Status", "id": "Status"},
     "tl_f_signal": {"en": "Entry signal", "id": "Sinyal masuk"},
     "tl_f_sleepy": {

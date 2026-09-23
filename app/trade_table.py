@@ -30,6 +30,15 @@ PERIODS = {
     "3m": pd.DateOffset(months=3), "6m": pd.DateOffset(months=6),
     "all": None, "custom": None,
 }
+#: Labels kept here, not in idxcore/i18n.py: a Streamlit hot reload re-imports
+#: this file but keeps the old i18n module, so new i18n keys raise KeyError
+#: until someone reboots the app.
+PERIOD_TITLE = "PERIOD"
+PERIOD_LABELS = {
+    "en": {"1w": "1W", "1m": "1M", "3m": "3M", "6m": "6M", "all": "All", "custom": "Custom"},
+    "id": {"1w": "1 Mgg", "1m": "1 Bln", "3m": "3 Bln", "6m": "6 Bln", "all": "Semua",
+           "custom": "Custom"},
+}
 
 
 def _filters(cur: pd.DataFrame, lang: str, key: str) -> pd.DataFrame:
@@ -38,14 +47,15 @@ def _filters(cur: pd.DataFrame, lang: str, key: str) -> pd.DataFrame:
     # One click for the usual windows; the range calendar only for Custom. Its
     # own row, so all six buttons fit on one line.
     period = st.segmented_control(
-        t("tl_f_dates", lang), list(PERIODS), default="all",
-        format_func=lambda p: t(f"tl_p_{p}", lang), key=f"{key}_period",
+        PERIOD_TITLE, list(PERIODS), default="all",
+        format_func=lambda p: PERIOD_LABELS.get(lang, PERIOD_LABELS["en"])[p],
+        key=f"{key}_period",
     )
     span = ()
     if len(dates) and period == "custom":
         with st.columns(2)[0]:
             span = st.date_input(
-                t("tl_f_dates", lang), label_visibility="collapsed",
+                PERIOD_TITLE, label_visibility="collapsed",
                 value=(dates.min().date(), dates.max().date()),
                 min_value=dates.min().date(), max_value=dates.max().date(),
                 key=f"{key}_dates",
