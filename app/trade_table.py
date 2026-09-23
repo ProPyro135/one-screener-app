@@ -23,30 +23,46 @@ STATUS_COLOUR = {
     tl.CLOSED: "#2E7D32", tl.EXIT: "#C62828",
 }
 STATUS_ORDER = [tl.OPEN, tl.WATCHLIST, tl.CLOSED, tl.EXIT]
+#: Quick periods, counted back from the newest BUY date. None = no lower bound
+#: ("all") or the calendar picker ("custom").
+PERIODS = {
+    "1w": pd.DateOffset(weeks=1), "1m": pd.DateOffset(months=1),
+    "3m": pd.DateOffset(months=3), "6m": pd.DateOffset(months=6),
+    "all": None, "custom": None,
+}
 
 
 def _filters(cur: pd.DataFrame, lang: str, key: str) -> pd.DataFrame:
     """The four filters, applied to the one-row-per-ticker view."""
     dates = pd.to_datetime(cur["buy_date"]).dropna()
-    c1, c2 = st.columns([2, 3])
+    # One click for the usual windows; the range calendar only for Custom. Its
+    # own row, so all six buttons fit on one line.
+    period = st.segmented_control(
+        t("tl_f_dates", lang), list(PERIODS), default="all",
+        format_func=lambda p: t(f"tl_p_{p}", lang), key=f"{key}_period",
+    )
+    span = ()
+    if len(dates) and period == "custom":
+        with st.columns(2)[0]:
+            span = st.date_input(
+                t("tl_f_dates", lang), label_visibility="collapsed",
+                value=(dates.min().date(), dates.max().date()),
+                min_value=dates.min().date(), max_value=dates.max().date(),
+                key=f"{key}_dates",
+            )
+    elif len(dates) and PERIODS.get(period) is not None:
+        hi = dates.max()
+        span = ((hi - PERIODS[period]).date(), hi.date())
+    c1, c2 = st.columns(2)
     with c1:
-        # A range picker rather than two boxes: the question is always "bought
-        # between X and Y", never one open-ended bound.
-        span = st.date_input(
-            t("tl_f_dates", lang),
-            value=(dates.min().date(), dates.max().date()) if len(dates) else (),
-            min_value=dates.min().date() if len(dates) else None,
-            max_value=dates.max().date() if len(dates) else None,
-            key=f"{key}_dates",
-        )
-    with c2:
         picked_status = st.multiselect(
             t("tl_f_status", lang),
             [s for s in STATUS_ORDER if s in set(cur["status"])],
             key=f"{key}_status",
         )
     codes = [c for c in sorted(set(cur["entry_code"].dropna())) if c]
-    picked_code = st.multiselect(t("tl_f_signal", lang), codes, key=f"{key}_code")
+    with c2:
+        picked_code = st.multiselect(t("tl_f_signal", lang), codes, key=f"{key}_code")
     skip_sleepy = st.checkbox(t("tl_f_sleepy", lang), value=True, key=f"{key}_sleepy")
 
     r = cur
@@ -130,7 +146,7 @@ def render(log: pd.DataFrame, lang: str, *, key: str) -> None:
     st.caption(t("tl_pick", lang))
 
     event = st.dataframe(
-        _style(r, lang), use_container_width=True, hide_index=True,
+        _style(r, lang), use_container_width=True, hide_index=True, placeholder="—",
         on_select="rerun", selection_mode="single-row", key=f"{key}_table",
     )
     st.caption(t("tl_legend", lang))
@@ -142,4 +158,5 @@ def render(log: pd.DataFrame, lang: str, *, key: str) -> None:
         hist = log[log["ticker"] == row["ticker"]].sort_values(
             "buy_date", ascending=False, na_position="first")
         st.subheader(t("tl_history", lang, name=row["idx_code"] or row["ticker"]))
-        st.dataframe(_style(hist, lang), use_container_width=True, hide_index=True)
+        st.dataframe(_style(hist, lang), use_container_width=True, hide_index=True,
+                     placeholder="—")

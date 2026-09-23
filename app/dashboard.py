@@ -324,6 +324,7 @@ def render_screener(
         table,
         use_container_width=True,
         hide_index=True,
+        placeholder="—",
         column_config={
             t("c_close", lang): st.column_config.NumberColumn(format="%.0f"),
             t("c_rsi", lang): st.column_config.NumberColumn(format="%.1f"),
@@ -469,7 +470,7 @@ def render_detail(
     row = signals[signals["ticker"] == choice].iloc[0]
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(t("c_close", lang), f"{row['close']:,.0f}" if pd.notna(row["close"]) else "—")
-    c2.metric(t("c_tier", lang), row["tier"] or "—")
+    c2.metric(t("c_tier", lang), row["tier"] if pd.notna(row["tier"]) else "—")
     c3.metric(t("c_depth", lang), int(row["alignment_depth"]))
     c4.metric(t("c_rsi", lang), f"{row['rsi14']:.1f}" if pd.notna(row["rsi14"]) else "—")
 
@@ -492,7 +493,8 @@ def render_detail(
 
     with st.expander(t("raw_rows", lang)):
         st.dataframe(
-            history.tail(20).iloc[::-1], use_container_width=True, hide_index=True
+            history.tail(20).iloc[::-1], use_container_width=True, hide_index=True,
+            placeholder="—",
         )
 
 

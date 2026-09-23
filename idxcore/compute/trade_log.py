@@ -34,7 +34,7 @@ OPEN = "OPEN"
 WATCHLIST = "WATCHLIST"
 #: Closed by a take-profit signal. Can still be a loss; read ``pl_pct``.
 CLOSED = "CLOSED"
-#: Closed by a cut-loss signal.
+#: Closed by a cut-loss signal. Can still be a gain; read ``pl_pct``.
 EXIT = "EXIT"
 
 #: How many bars the liquidity measure averages over.
@@ -168,8 +168,10 @@ def _self_check(db_path: str) -> None:
         # The peak is taken over the trade's own bars, so it cannot sit below
         # the price the trade exited at.
         assert (traded["max_fl_pct"] >= traded["pl_pct"].fillna(-1e9) - 1e-9).all()
-        # EXIT is the cut-loss bucket by construction.
-        assert (cur[cur["status"] == EXIT]["pl_pct"] < 0).all()
+        # EXIT is the cut-loss bucket by construction. Not necessarily a loss:
+        # Bottom Fishing's stops trigger on the bar's low but fill at its close,
+        # so a bar that dips through the stop and recovers exits in profit.
+        assert (cur[cur["status"] == EXIT]["exit_code"].map(mod.category_of) == "CUT LOSS").all()
         print(f"{mod.__name__}: {len(log)} trades, {len(cur)} tickers, "
               f"{dict(cur['status'].value_counts())}")
     print("trade_log self-check OK")
