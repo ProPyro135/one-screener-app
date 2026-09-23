@@ -150,10 +150,10 @@ def latest(log: pd.DataFrame) -> pd.DataFrame:
 
 def _self_check(db_path: str) -> None:
     """Assert the log's invariants against a real store. See __main__ below."""
-    from idxcore.compute import bottom_fishing, market_structure
+    from idxcore.compute import bottom_fishing, market_structure, reversal_sniper
 
     con = duckdb.connect(db_path, read_only=True)
-    for mod in (market_structure, bottom_fishing):
+    for mod in (market_structure, reversal_sniper, bottom_fishing):
         log = build(con, mod)
         cur = latest(log)
         traded = log[log["status"] != WATCHLIST]
@@ -171,12 +171,17 @@ def _self_check(db_path: str) -> None:
         # the price the trade exited at.
         assert (traded["max_fl_pct"].isna()
                 | (traded["max_fl_pct"] >= traded["pl_pct"].fillna(-1e9) - 1e-9)).all()
-        # H+1 onward: a trade bought on the last bar has no peak yet.
-        assert traded.loc[traded["max_fl_pct"].isna(), "status"].eq(OPEN).all()
+        # H+1 onward: no peak for a trade bought on the last bar, or one that
+        # exited on its own entry bar (Reversal Sniper checks its CL there).
+        no_peak = traded[traded["max_fl_pct"].isna()]
+        assert (no_peak["status"].eq(OPEN) | no_peak["exit_date"].eq(no_peak["buy_date"])).all()
         # EXIT is the cut-loss bucket by construction. Not necessarily a loss:
         # Bottom Fishing's stops trigger on the bar's low but fill at its close,
         # so a bar that dips through the stop and recovers exits in profit.
         assert (cur[cur["status"] == EXIT]["exit_code"].map(mod.category_of) == "CUT LOSS").all()
+        # The owner's rule for the Pine strategies: a take-profit is a profit.
+        if mod is not bottom_fishing:
+            assert (log.loc[log["status"] == CLOSED, "pl_pct"] > 0).all()
         print(f"{mod.__name__}: {len(log)} trades, {len(cur)} tickers, "
               f"{dict(cur['status'].value_counts())}")
     print("trade_log self-check OK")

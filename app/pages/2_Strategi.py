@@ -1,10 +1,9 @@
-"""Market Structure — a second screener.
+"""Strategi — the owner's Pine Script strategies, one trade table.
 
-A radar over the whole active universe using the Market Structure auto-engine
-(regime EMA20/SMA200 + swing pivots + dry-volume pullback breakout). Each stock
-is coloured by its current state — RISING (in a position), WATCH (a pullback is
-armed), WAIT (flat) — with its latest signal and reason. Read-only over the
-store, so it runs unchanged on the full local store and the slim hosted one.
+Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper) and the
+same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
+CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
+local store and the slim hosted one.
 """
 
 from __future__ import annotations
@@ -23,11 +22,40 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import trade_table  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
+from idxcore.compute import reversal_sniper as rs  # noqa: E402
 from idxcore.compute import trade_log as tl  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db  # noqa: E402
 
-st.set_page_config(page_title="Market Structure — IDX", page_icon="🏗️", layout="wide")
+st.set_page_config(page_title="Strategi — IDX", page_icon="🏗️", layout="wide")
+
+# Strings live here, not in idxcore/i18n.py: page code is re-run on every
+# deploy, while a hot reload can keep an old i18n module in memory.
+TITLE = {"en": "Pine Script strategies", "id": "Strategi Pine Script"}
+STRATEGIES = {
+    "A": (ms, "ms", {
+        "en": ("Market Structure. Auto regime (EMA20 in a volatile swing, otherwise "
+               "SMA200), a rebound off a higher swing low on dry volume, then a "
+               "volume-backed breakout. TP only when the exit is above the buy price. "
+               "Monitoring, not a proven signal."),
+        "id": ("Market Structure. Regime otomatis (EMA20 saat swing volatil, selain "
+               "itu SMA200), rebound dari swing-low yang lebih tinggi dengan volume "
+               "kering, lalu breakout didukung volume. TP hanya kalau harga keluar di "
+               "atas harga beli. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+    "B": (rs, "rs", {
+        "en": ("Reversal Sniper. After a 50-day low, a higher high and higher low, "
+               "then a close above the high (BUY HH-HL); after a TP, a dip under MA20 "
+               "and a close back above it (BUY Re-Entry). TP on the first close under "
+               "MA5 after a rally, only when above the buy price. Monitoring, not a "
+               "proven signal."),
+        "id": ("Reversal Sniper. Setelah dasar 50 hari, terbentuk higher high dan "
+               "higher low, lalu close di atas puncak (BUY HH-HL); setelah TP, harga "
+               "turun ke bawah MA20 lalu close kembali di atasnya (BUY Re-Entry). TP "
+               "saat close pertama di bawah MA5 setelah reli, hanya kalau di atas "
+               "harga beli. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+}
 
 
 def _resolve_db_path() -> str:
@@ -79,8 +107,13 @@ def _pick_language() -> str:
 
 lang = _pick_language()
 
-st.title(f"🏗️ {t('ms_title', lang)}")
-st.caption(t("ms_caption", lang))
+st.title(f"🏗️ {TITLE.get(lang, TITLE['en'])}")
+pick = st.segmented_control(
+    "STRATEGI", list(STRATEGIES), default="A",
+    format_func=lambda k: f"PINESCRIPT {k}", key="strategy",
+) or "A"  # clicking the active button deselects it; keep showing A
+mod, table_key, caption = STRATEGIES[pick]
+st.caption(caption.get(lang, caption["en"]))
 
 
 # The build walks every ticker's bars through the state machine — ~22s — and the
@@ -100,14 +133,14 @@ def _data_version() -> str:
 
 
 @st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
-def _log(version: str):
+def _log(version: str, pick: str):
     with _connection() as con:
-        return None if con is None else tl.build(con, ms)
+        return None if con is None else tl.build(con, STRATEGIES[pick][0])
 
 
 st.subheader(t("ms_screener", lang))
 try:
-    log = _log(_data_version())
+    log = _log(_data_version(), pick)
 except StoreBusy:
     st.info(t("store_busy", lang), icon="⏳")
     st.stop()
@@ -116,4 +149,4 @@ if log is None or log.empty:
     st.error(t("no_store", lang, path=DB_PATH))
     st.stop()
 
-trade_table.render(log, lang, key="ms")
+trade_table.render(log, lang, key=table_key)

@@ -6,7 +6,8 @@ code on the bars where something happens:
 
     PANTAU               a higher-low rebound on dry volume is forming (watch)
     BUY LOW (EMA20/…)    breakout entry off that pullback, regime-tagged
-    SELL HIGH            take profit: reversal at a structure top or after +8%
+    SELL HIGH            take profit: reversal at a structure top or after +8%,
+                         closing above the entry price
     SL                   cut loss: close breaks the initial swing-low stop
 
 Consistent with the rest of this app
@@ -48,7 +49,7 @@ REASON_MAP = {
     "PANTAU": "Pantau: rebound Higher-Low dengan volume kering, menunggu konfirmasi breakout",
     "BUY LOW (EMA20)": "Entry breakout pullback kering di regime momentum (Close > EMA20), rebound dari Higher-Low",
     "BUY LOW (SMA200)": "Entry breakout pullback kering di regime makro (Close > SMA200), rebound dari Higher-Low",
-    "SELL HIGH": "Take Profit: reversal di pucuk (kenaikan >= 8% atau sentuh resisten swing)",
+    "SELL HIGH": "Take Profit: reversal di pucuk (kenaikan >= 8% atau sentuh resisten swing), close di atas harga beli",
     "SL": "Cut Loss: Close jebol di bawah Stop Loss awal (di bawah swing low)",
 }
 
@@ -208,7 +209,9 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
                 not np.isnan(major_high) and h[i] >= major_high * 0.99
             )
             top_reversal = c[i] < o[i] and i > 0 and c[i] < lo[i - 1]
-            if reached_target and top_reversal:
+            # Owner's rule: a take-profit must be a profit. The original Pine
+            # let a reversal below the entry count as SELL HIGH.
+            if reached_target and top_reversal and c[i] > entry_price:
                 codes[i] = "SELL HIGH"
             elif not np.isnan(initial_sl) and c[i] < initial_sl:
                 codes[i] = "SL"
