@@ -73,9 +73,11 @@ def turnover(con: duckdb.DuckDBPyConnection, bars: int = TURNOVER_BARS) -> pd.Se
 def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
     entry = float(t["entry_price"])
     running = not t["resolved"]
-    # Highest high the trade actually saw. For a running trade the machine sets
-    # exit_date to the last bar, so this spans entry -> today.
-    span = (g["date"] >= t["entry_date"]) & (g["date"] <= t["exit_date"])
+    # Highest high the trade actually saw: from H+1 through the exit bar. The
+    # entry fills at the entry bar's close, so that bar's high came before the
+    # buy. For a running trade the machine sets exit_date to the last bar; one
+    # bought on the last bar has no peak yet (NaN).
+    span = (g["date"] > t["entry_date"]) & (g["date"] <= t["exit_date"])
     hi = float(pd.to_numeric(g.loc[span, "high"], errors="coerce").max())
     ret = float(t["gross_return_pct"])
 
@@ -167,7 +169,10 @@ def _self_check(db_path: str) -> None:
         assert cur[cur["status"] == WATCHLIST]["buy_price"].isna().all()
         # The peak is taken over the trade's own bars, so it cannot sit below
         # the price the trade exited at.
-        assert (traded["max_fl_pct"] >= traded["pl_pct"].fillna(-1e9) - 1e-9).all()
+        assert (traded["max_fl_pct"].isna()
+                | (traded["max_fl_pct"] >= traded["pl_pct"].fillna(-1e9) - 1e-9)).all()
+        # H+1 onward: a trade bought on the last bar has no peak yet.
+        assert traded.loc[traded["max_fl_pct"].isna(), "status"].eq(OPEN).all()
         # EXIT is the cut-loss bucket by construction. Not necessarily a loss:
         # Bottom Fishing's stops trigger on the bar's low but fill at its close,
         # so a bar that dips through the stop and recovers exits in profit.
