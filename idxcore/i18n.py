@@ -484,7 +484,6 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     "tl_turnover": {"en": "Turnover/day", "id": "Nilai transaksi/hari"},
 
     "tl_f_status": {"en": "Status", "id": "Status"},
-    "tl_f_signal": {"en": "Entry signal", "id": "Sinyal masuk"},
     "tl_f_sleepy": {
         "en": "Skip sleepy stocks (turnover under Rp100 m/day)",
         "id": "Lewati saham tidur (nilai transaksi di bawah Rp100 jt/hari)",
@@ -530,9 +529,6 @@ overbought/oversold konvensional; sistem ini tidak memakainya.""",
     },
 
     # ---- search-page radar screener ----
-    "sr_screener": {"en": "Radar — where each stock is now",
-                    "id": "Radar — posisi tiap saham sekarang"},
-    "sr_lookup": {"en": "Look up one stock", "id": "Cari satu saham"},
     "ms_title": {"en": "Market Structure", "id": "Market Structure"},
     "ms_caption": {
         "en": ("A second screener. Auto-switching regime (EMA20 in a volatile "

@@ -42,7 +42,7 @@ PERIOD_LABELS = {
 
 
 def _filters(cur: pd.DataFrame, lang: str, key: str) -> pd.DataFrame:
-    """The four filters, applied to the one-row-per-ticker view."""
+    """The filters, applied to the one-row-per-ticker view."""
     dates = pd.to_datetime(cur["buy_date"]).dropna()
     # One click for the usual windows; the range calendar only for Custom. Its
     # own row, so all six buttons fit on one line.
@@ -63,16 +63,12 @@ def _filters(cur: pd.DataFrame, lang: str, key: str) -> pd.DataFrame:
     elif len(dates) and PERIODS.get(period) is not None:
         hi = dates.max()
         span = ((hi - PERIODS[period]).date(), hi.date())
-    c1, c2 = st.columns(2)
-    with c1:
+    with st.columns(2)[0]:
         picked_status = st.multiselect(
             t("tl_f_status", lang),
             [s for s in STATUS_ORDER if s in set(cur["status"])],
             key=f"{key}_status",
         )
-    codes = [c for c in sorted(set(cur["entry_code"].dropna())) if c]
-    with c2:
-        picked_code = st.multiselect(t("tl_f_signal", lang), codes, key=f"{key}_code")
     skip_sleepy = st.checkbox(t("tl_f_sleepy", lang), value=True, key=f"{key}_sleepy")
 
     r = cur
@@ -86,8 +82,6 @@ def _filters(cur: pd.DataFrame, lang: str, key: str) -> pd.DataFrame:
         r = r[bd.between(lo, hi) | bd.isna()]
     if picked_status:
         r = r[r["status"].isin(picked_status)]
-    if picked_code:
-        r = r[r["entry_code"].isin(picked_code)]
     if skip_sleepy:
         r = r[~(r["turnover"] < tl.SLEEPY_TURNOVER)]
     return r

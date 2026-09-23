@@ -18,12 +18,8 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from idxcore.charts import PLOTLY_CONFIG, build_combined_figure  # noqa: E402
-import trade_table  # noqa: E402
-from idxcore.compute import bottom_fishing as bf  # noqa: E402
-from idxcore.compute import trade_log as tl  # noqa: E402
 from idxcore.compute.signals import render_criteria  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db, read  # noqa: E402
@@ -118,45 +114,6 @@ except StoreBusy:
 if signals is None or signals.empty:
     st.error(t("no_store", lang, path=DB_PATH))
     st.stop()
-
-# ---------------------------------------------------------------------------
-# trade log — every Bottom Fishing BUY through to its TP/CL, newest first
-# ---------------------------------------------------------------------------
-
-# ~25s to walk every ticker through the state machine, against a store that
-# changes once a trading day, so the cache is held for an hour rather than 5min.
-def _data_version() -> str:
-    """The published slim-store version, read here rather than from idxcore.
-
-    Deliberately not `db._read_marker`: a Streamlit redeploy is often a hot
-    reload that re-runs this script against already-imported modules, so any
-    newly added attribute of `idxcore.store.db` is missing until a real reboot
-    and the page dies with an AttributeError. Page code is always fresh.
-    """
-    try:
-        return (Path("data") / "slim_version.txt").read_text(encoding="utf-8-sig").strip()
-    except OSError:
-        return ""
-
-
-@st.cache_data(ttl=3600, show_spinner="Menyusun tabel trade…")
-def _log(version: str):
-    with _connection() as con:
-        return None if con is None else tl.build(con, bf)
-
-
-st.subheader(t("sr_screener", lang))
-try:
-    log = _log(_data_version())
-except StoreBusy:
-    log = None
-    st.info(t("store_busy", lang), icon="⏳")
-
-if log is not None and not log.empty:
-    trade_table.render(log, lang, key="bf")
-
-st.divider()
-st.subheader(f"🔎 {t('sr_lookup', lang)}")
 
 # Native searchable dropdown: "BBCA — Bank Central Asia Tbk."
 code = (signals["idx_code"] if "idx_code" in signals.columns else signals["ticker"])
