@@ -46,7 +46,7 @@ SLEEPY_TURNOVER = 100_000_000.0
 
 COLUMNS = [
     "ticker", "idx_code", "name", "status", "buy_date", "pb", "buy_price",
-    "last_close", "fl_pct", "hi_price", "max_fl_pct", "exit_date", "exit_price",
+    "last_close", "fl_pct", "hi_price", "hi_date", "max_fl_pct", "exit_date", "exit_price",
     "pl_pct", "entry_code", "exit_code", "turnover",
 ]
 
@@ -79,7 +79,10 @@ def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
     # buy. For a running trade the machine sets exit_date to the last bar; one
     # bought on the last bar has no peak yet (NaN).
     span = (g["date"] > t["entry_date"]) & (g["date"] <= t["exit_date"])
-    hi = float(pd.to_numeric(g.loc[span, "high"], errors="coerce").max())
+    highs = pd.to_numeric(g.loc[span, "high"], errors="coerce")
+    hi = float(highs.max())
+    # The day Max % FL was reached: the first bar that printed that high.
+    hi_date = g.at[highs.idxmax(), "date"] if highs.notna().any() else pd.NaT
     ret = float(t["gross_return_pct"])
 
     row = dict(base)
@@ -88,7 +91,7 @@ def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
         (EXIT if mod.category_of(t["exit_code"]) == "CUT LOSS" else CLOSED),
         pb="B",
         buy_date=t["entry_date"], buy_price=entry, entry_code=t["entry_code"],
-        hi_price=hi, max_fl_pct=(hi / entry - 1.0) * 100.0,
+        hi_price=hi, hi_date=hi_date, max_fl_pct=(hi / entry - 1.0) * 100.0,
     )
     # The same number means different things either side of the exit, so it is
     # never in both columns at once: floating while open, realised once closed.
@@ -177,6 +180,11 @@ def _self_check(db_path: str) -> None:
         # H+1 onward: no peak for a trade bought on the last bar, or one that
         # exited on its own entry bar (Reversal Sniper checks its CL there).
         no_peak = traded[traded["max_fl_pct"].isna()]
+        # The peak's date sits inside the trade: after the BUY, by the exit.
+        assert traded["hi_date"].isna().equals(traded["max_fl_pct"].isna())
+        peaked = traded[traded["hi_date"].notna()]
+        end = peaked["exit_date"].fillna(pd.Timestamp.max)
+        assert ((peaked["hi_date"] > peaked["buy_date"]) & (peaked["hi_date"] <= end)).all()
         assert (no_peak["status"].eq(OPEN) | no_peak["exit_date"].eq(no_peak["buy_date"])).all()
         # EXIT is the cut-loss bucket by construction. Not necessarily a loss:
         # Bottom Fishing's stops trigger on the bar's low but fill at its close,

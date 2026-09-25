@@ -10,6 +10,8 @@ sorted newest BUY first and every filter narrows toward a fresh entry.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pandas as pd
 import streamlit as st
 
@@ -42,6 +44,9 @@ PERIOD_LABELS = {
     "id": {"1w": "1 Mgg", "1m": "1 Bln", "3m": "3 Bln", "6m": "6 Bln", "1y": "1 Thn",
            "3y": "3 Thn", "5y": "5 Thn", "all": "Semua", "custom": "Custom"},
 }
+HI_DATE_LABEL = {"en": "Hi date", "id": "Tgl Hi"}
+#: Earliest date the Custom calendar offers; the full store starts 2016-08-15.
+FIRST_DATE = date(2016, 1, 1)
 #: The backtest view lists at most this many trades, newest first. Styling tens
 #: of thousands of rows would lag the page; the summary still counts them all.
 MAX_ROWS = 500
@@ -69,23 +74,34 @@ TEXT = {
 }
 
 
-def _filters(cur: pd.DataFrame, lang: str, key: str, default: str = "all") -> pd.DataFrame:
-    """PERIOD, status and sleepy filters over whichever rows are passed in."""
+def _filters(
+    cur: pd.DataFrame, lang: str, key: str, *,
+    statuses: list[str], default_period: str = "all",
+    default_status: tuple[str, ...] = (),
+) -> pd.DataFrame:
+    """PERIOD, status and sleepy filters over whichever rows are passed in.
+
+    The widgets are keyed by view, not by strategy, and take the same options,
+    bounds and defaults whatever strategy is showing. Streamlit then treats
+    them as the same widgets across a strategy switch and keeps what the user
+    picked; anything strategy-specific here (a status list, a calendar bound)
+    would make it a new widget and reset the filter.
+    """
     dates = pd.to_datetime(cur["buy_date"]).dropna()
     # One click for the usual windows; the range calendar only for Custom. Its
     # own row, so all the buttons fit on one line.
     period = st.segmented_control(
-        PERIOD_TITLE, list(PERIODS), default=default,
+        PERIOD_TITLE, list(PERIODS), default=default_period,
         format_func=lambda p: PERIOD_LABELS.get(lang, PERIOD_LABELS["en"])[p],
         key=f"{key}_period",
     )
     span = ()
-    if len(dates) and period == "custom":
+    if period == "custom":
         with st.columns(2)[0]:
             span = st.date_input(
                 PERIOD_TITLE, label_visibility="collapsed",
-                value=(dates.min().date(), dates.max().date()),
-                min_value=dates.min().date(), max_value=dates.max().date(),
+                value=(FIRST_DATE, date.today()),
+                min_value=FIRST_DATE, max_value=date.today(),
                 key=f"{key}_dates",
             )
     elif len(dates) and PERIODS.get(period) is not None:
@@ -93,8 +109,7 @@ def _filters(cur: pd.DataFrame, lang: str, key: str, default: str = "all") -> pd
         span = ((hi - PERIODS[period]).date(), hi.date())
     with st.columns(2)[0]:
         picked_status = st.multiselect(
-            t("tl_f_status", lang),
-            [s for s in STATUS_ORDER if s in set(cur["status"])],
+            t("tl_f_status", lang), statuses, default=list(default_status),
             key=f"{key}_status",
         )
     skip_sleepy = st.checkbox(t("tl_f_sleepy", lang), value=True, key=f"{key}_sleepy")
@@ -127,6 +142,8 @@ def _style(frame: pd.DataFrame, lang: str):
         t("tl_last", lang): frame["last_close"],
         t("tl_fl", lang): frame["fl_pct"],
         t("tl_hi", lang): frame["hi_price"],
+        # Absent from a trade log published before the column existed.
+        HI_DATE_LABEL.get(lang, "Hi date"): pd.to_datetime(frame.get("hi_date")),
         t("tl_max_fl", lang): frame["max_fl_pct"],
         t("tl_exit_date", lang): pd.to_datetime(frame["exit_date"]),
         t("tl_exit_price", lang): frame["exit_price"],
@@ -156,6 +173,7 @@ def _style(frame: pd.DataFrame, lang: str):
     fmt = {c: "{:,.0f}" for c in price_cols}
     fmt.update({c: "{:+.2f}%" for c in pct_cols})
     fmt[t("tl_buy_date", lang)] = "{:%d/%m/%Y}"
+    fmt[HI_DATE_LABEL.get(lang, "Hi date")] = "{:%d/%m/%Y}"
     fmt[t("tl_exit_date", lang)] = "{:%d/%m/%Y}"
     return (out.style
             .map(paint_status, subset=[t("tl_status", lang)])
@@ -163,11 +181,28 @@ def _style(frame: pd.DataFrame, lang: str):
             .format(fmt, na_rep="—"))
 
 
+def _history(event, rows: pd.DataFrame, log: pd.DataFrame, lang: str) -> None:
+    """The clicked row's stock: every trade it had, newest first."""
+    picked = event.selection.rows if event and event.selection else []
+    if not picked or picked[0] >= len(rows):
+        return
+    row = rows.iloc[picked[0]]
+    hist = log[log["ticker"] == row["ticker"]].sort_values(
+        "buy_date", ascending=False, na_position="first")
+    st.subheader(t("tl_history", lang, name=row["idx_code"] or row["ticker"]))
+    st.dataframe(_style(hist, lang), use_container_width=True, hide_index=True,
+                 placeholder="—")
+
+
 def _backtest(log: pd.DataFrame, lang: str, key: str) -> None:
     """Every trade bought in the period, a measured summary, and the newest rows."""
     tx = TEXT.get(lang, TEXT["en"])
     # Delisted names stay in: a backtest that drops the failures flatters itself.
-    r = _filters(log[log["status"] != tl.WATCHLIST], lang, f"{key}_bt", default="1y")
+    r = _filters(
+        log[log["status"] != tl.WATCHLIST], lang, "tl_bt",
+        statuses=[tl.OPEN, tl.CLOSED, tl.EXIT], default_period="custom",
+        default_status=(tl.CLOSED, tl.EXIT),
+    )
     r = r.sort_values("buy_date", ascending=False)
     done = r[r["status"].isin([tl.CLOSED, tl.EXIT])]
     pl = done["pl_pct"]
@@ -197,20 +232,30 @@ def _backtest(log: pd.DataFrame, lang: str, key: str) -> None:
     if done.empty:
         st.info(tx["none"])
 
-    st.dataframe(_style(r.head(MAX_ROWS), lang), use_container_width=True,
-                 hide_index=True, placeholder="—")
+    shown = r.head(MAX_ROWS)
+    st.caption(t("tl_pick", lang))
+    # The table key stays per strategy: a selection is a row number, which
+    # would point at some other trade after a switch.
+    event = st.dataframe(
+        _style(shown, lang), use_container_width=True, hide_index=True,
+        placeholder="—", on_select="rerun", selection_mode="single-row",
+        key=f"{key}_bt_table",
+    )
     if len(r) > MAX_ROWS:
         st.caption(tx["capped"].format(shown=MAX_ROWS, total=len(r)))
     st.caption(t("tl_legend", lang))
+    _history(event, shown, log, lang)
 
 
 def render(log: pd.DataFrame, lang: str, *, key: str) -> None:
     """Current positions (one row per ticker, history on click) or the backtest."""
     tx = TEXT.get(lang, TEXT["en"])
+    # Opens on the backtest; the view and every filter below are shared by
+    # all strategies, so switching A/B/C keeps them.
     mode = st.segmented_control(
-        tx["view"], ["now", "bt"], default="now",
-        format_func=lambda m: tx[m], key=f"{key}_mode",
-    ) or "now"
+        tx["view"], ["now", "bt"], default="bt",
+        format_func=lambda m: tx[m], key="tl_mode",
+    ) or "bt"
     if mode == "bt":
         _backtest(log, lang, key)
         return
@@ -219,7 +264,7 @@ def render(log: pd.DataFrame, lang: str, *, key: str) -> None:
     if "is_active" in cur.columns:
         # Where each stock stands today only makes sense for listed stocks.
         cur = cur[cur["is_active"]]
-    r = _filters(cur, lang, key)
+    r = _filters(cur, lang, "tl_now", statuses=STATUS_ORDER)
     # Newest entry first — the whole point of adding the date. Watchlist rows
     # have no BUY date and sort to the bottom.
     r = r.sort_values("buy_date", ascending=False, na_position="last")
@@ -236,12 +281,4 @@ def render(log: pd.DataFrame, lang: str, *, key: str) -> None:
     )
     st.caption(t("tl_legend", lang))
     st.caption(t("tl_gross", lang))
-
-    picked = event.selection.rows if event and event.selection else []
-    if picked:
-        row = r.iloc[picked[0]]
-        hist = log[log["ticker"] == row["ticker"]].sort_values(
-            "buy_date", ascending=False, na_position="first")
-        st.subheader(t("tl_history", lang, name=row["idx_code"] or row["ticker"]))
-        st.dataframe(_style(hist, lang), use_container_width=True, hide_index=True,
-                     placeholder="—")
+    _history(event, r, log, lang)
