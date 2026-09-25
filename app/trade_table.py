@@ -48,7 +48,8 @@ MAX_ROWS = 500
 TEXT = {
     "en": {"view": "VIEW", "now": "Current positions", "bt": "Backtest",
            "trades": "Trades", "tp": "TP", "cl": "CL", "open": "Still open",
-           "win": "Win rate", "avg": "Average P&L", "median": "Median P&L",
+           "win": "Win rate", "avg": "Average P&L",
+           "avg_tp": "Average TP", "avg_cl": "Average CL",
            "none": "No closed trade in this selection.",
            "note": ("Measured on every trade in the selection, bought from {first} to "
                     "{last}. Gross: broker fees are not deducted. Win rate and P&L count "
@@ -57,7 +58,8 @@ TEXT = {
            "capped": "Showing the newest {shown:,} of {total:,} trades; the summary above counts all of them."},
     "id": {"view": "TAMPILAN", "now": "Posisi terkini", "bt": "Backtest",
            "trades": "Trade", "tp": "TP", "cl": "CL", "open": "Masih open",
-           "win": "Win rate", "avg": "Rata-rata P&L", "median": "Median P&L",
+           "win": "Win rate", "avg": "Rata-rata P&L",
+           "avg_tp": "Rata-rata TP", "avg_cl": "Rata-rata CL",
            "none": "Tidak ada trade yang sudah selesai di pilihan ini.",
            "note": ("Diukur dari semua trade di pilihan ini, BUY dari {first} sampai "
                     "{last}. Bruto: fee broker belum dipotong. Win rate dan P&L hanya "
@@ -170,13 +172,22 @@ def _backtest(log: pd.DataFrame, lang: str, key: str) -> None:
     done = r[r["status"].isin([tl.CLOSED, tl.EXIT])]
     pl = done["pl_pct"]
 
-    c = st.columns(6)
+    def avg(s: pd.Series) -> str:
+        return f"{s.mean():+.2f}%" if len(s) else "—"
+
+    # Average P&L is the mean over every CLOSED and EXIT trade. The TP and CL
+    # averages beside it show how a low win rate can still average a profit.
+    tp_pl = done.loc[done["status"] == tl.CLOSED, "pl_pct"]
+    cl_pl = done.loc[done["status"] == tl.EXIT, "pl_pct"]
+    c = st.columns(4)
     c[0].metric(tx["trades"], f"{len(r):,}")
-    c[1].metric(tx["tp"], f"{(done['status'] == tl.CLOSED).sum():,}")
-    c[2].metric(tx["cl"], f"{(done['status'] == tl.EXIT).sum():,}")
+    c[1].metric(tx["tp"], f"{len(tp_pl):,}")
+    c[2].metric(tx["cl"], f"{len(cl_pl):,}")
     c[3].metric(tx["win"], f"{(pl > 0).mean() * 100:.1f}%" if len(pl) else "—")
-    c[4].metric(tx["avg"], f"{pl.mean():+.2f}%" if len(pl) else "—")
-    c[5].metric(tx["median"], f"{pl.median():+.2f}%" if len(pl) else "—")
+    c = st.columns(4)
+    c[0].metric(tx["avg"], avg(pl))
+    c[1].metric(tx["avg_tp"], avg(tp_pl))
+    c[2].metric(tx["avg_cl"], avg(cl_pl))
     if r.empty:
         st.info(tx["none"])
         return

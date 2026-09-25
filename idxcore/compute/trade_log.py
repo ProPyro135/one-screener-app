@@ -6,8 +6,8 @@ has it done since. A radar row reading BUY LOW is not news if the entry was in
 May — of the 340 open Market Structure positions on 2026-08-31, only 76 were
 entered within the last week.
 
-``bottom_fishing``, ``market_structure``, ``reversal_sniper`` and
-``pullback_sniper`` are the same shape — a state machine
+``bottom_fishing``, ``market_structure``, ``reversal_sniper`` and ``ut_bot``
+are the same shape — a state machine
 returning ``(codes, trades, lines)`` with identical trade records — so one
 builder serves them all. Pass the module itself as ``mod``.
 
@@ -152,11 +152,11 @@ def latest(log: pd.DataFrame) -> pd.DataFrame:
 def _self_check(db_path: str) -> None:
     """Assert the log's invariants against a real store. See __main__ below."""
     from idxcore.compute import (
-        bottom_fishing, market_structure, pullback_sniper, reversal_sniper,
+        bottom_fishing, market_structure, reversal_sniper, ut_bot,
     )
 
     con = duckdb.connect(db_path, read_only=True)
-    for mod in (market_structure, reversal_sniper, pullback_sniper, bottom_fishing):
+    for mod in (market_structure, reversal_sniper, ut_bot, bottom_fishing):
         log = build(con, mod)
         cur = latest(log)
         traded = log[log["status"] != WATCHLIST]
@@ -207,9 +207,9 @@ def publish(full_path: str, slim_path: str) -> int:
     names that failed. ``is_active`` travels with each row so the current-
     status view can still hide them.
     """
-    from idxcore.compute import market_structure, pullback_sniper, reversal_sniper
+    from idxcore.compute import market_structure, reversal_sniper, ut_bot
 
-    strategies = {"A": market_structure, "B": reversal_sniper, "C": pullback_sniper}
+    strategies = {"A": market_structure, "B": reversal_sniper, "C": ut_bot}
     full = duckdb.connect(full_path, read_only=True)
     try:
         active = dict(full.execute("SELECT ticker, is_active FROM tickers").fetchall())

@@ -1,7 +1,7 @@
 """Strategi — the owner's Pine Script strategies, one trade table.
 
-Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
-Pullback Sniper) and the
+Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C = UT
+Bot) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -23,9 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import trade_table  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
-from idxcore.compute import pullback_sniper as ps  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
 from idxcore.compute import trade_log as tl  # noqa: E402
+from idxcore.compute import ut_bot as ut  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db  # noqa: E402
 
@@ -57,17 +57,18 @@ STRATEGIES = {
                "saat close pertama di bawah MA5 setelah reli, hanya kalau di atas "
                "harga beli. Ini pemantauan, bukan sinyal terbukti."),
     }),
-    "C": (ps, "ps", {
-        "en": ("Pullback Sniper. In an uptrend (Bollinger mid rising over 10 days), a "
-               "green bar under the mid that closes above the previous close and "
-               "SMA5. TP above the buy price when price is over the mid but back "
-               "under SMA5, or tags the upper band on a red bar. CL at the 7-day "
-               "low, at most -10%. Monitoring, not a proven signal."),
-        "id": ("Pullback Sniper. Saat tren naik (MA20 lebih tinggi dari 10 hari lalu), "
-               "candle hijau di bawah MA20 yang close di atas close kemarin dan "
-               "SMA5. TP di atas harga beli saat harga di atas MA20 tapi kembali di "
-               "bawah SMA5, atau menyentuh upper band dengan candle merah. CL di "
-               "low 7 hari, maksimal -10%. Ini pemantauan, bukan sinyal terbukti."),
+    "C": (ut, "ut", {
+        "en": ("UT Bot (1 x ATR100 trailing stop). BUY on a green or flat bar that "
+               "opens at or under the stop and closes through it, or stays under it "
+               "as a symmetric doji. TP above the buy price when the close crosses "
+               "under the stop, or tags the upper band on a red bar. CL when the "
+               "close is 5% under the buy price. Monitoring, not a proven signal."),
+        "id": ("UT Bot (trailing stop 1 x ATR100). BUY saat candle hijau/flat yang "
+               "open di bawah atau pas garis, lalu close menembus garis, atau tetap "
+               "di bawah garis tapi berbentuk doji simetris. TP di atas harga beli "
+               "saat close turun menembus garis, atau menyentuh upper band dengan "
+               "candle merah. CL saat close turun 5% dari harga beli. Ini "
+               "pemantauan, bukan sinyal terbukti."),
     }),
 }
 
