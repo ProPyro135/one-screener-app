@@ -58,16 +58,18 @@ STRATEGIES = {
                "harga beli. Ini pemantauan, bukan sinyal terbukti."),
     }),
     "C": (ut, "ut", {
-        "en": ("UT Bot (1 x ATR100 trailing stop). BUY on a green or flat bar that "
-               "opens at or under the stop and closes through it, or stays under it "
-               "as a symmetric doji. TP above the buy price when the close crosses "
-               "under the stop, or tags the upper band on a red bar. CL when the "
-               "close is 5% under the buy price. Monitoring, not a proven signal."),
-        "id": ("UT Bot (trailing stop 1 x ATR100). BUY saat candle hijau/flat yang "
-               "open di bawah atau pas garis, lalu close menembus garis, atau tetap "
-               "di bawah garis tapi berbentuk doji simetris. TP di atas harga beli "
-               "saat close turun menembus garis, atau menyentuh upper band dengan "
-               "candle merah. CL saat close turun 5% dari harga beli. Ini "
+        "en": ("UT Bot (1 x ATR100 trailing stop, strict MA20 filter). BUY on a green "
+               "or flat bar that opens at or under yesterday's stop and closes through "
+               "it, or stays within 3% under it as a symmetric doji; never while MA20 "
+               "is below its value 10 days ago. TP on the first close back under MA20 "
+               "after being above it, only above the buy price. CL when the close is "
+               "5% under the buy price. Monitoring, not a proven signal."),
+        "id": ("UT Bot (trailing stop 1 x ATR100, filter MA20 ketat). BUY saat candle "
+               "hijau/flat yang open di bawah atau pas garis kemarin lalu close "
+               "menembus garis, atau doji simetris maksimal 3% di bawah garis; tidak "
+               "pernah BUY saat MA20 lebih rendah dari 10 hari lalu. TP saat close "
+               "pertama kembali di bawah MA20 setelah sempat di atasnya, hanya kalau "
+               "di atas harga beli. CL saat close turun 5% dari harga beli. Ini "
                "pemantauan, bukan sinyal terbukti."),
     }),
 }
