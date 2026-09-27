@@ -1,7 +1,6 @@
 """Strategi — the owner's Pine Script strategies, one trade table.
 
-Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C = UT
-Bot) and the
+Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -25,7 +24,6 @@ import trade_table  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
 from idxcore.compute import trade_log as tl  # noqa: E402
-from idxcore.compute import ut_bot as ut  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db  # noqa: E402
 
@@ -56,21 +54,6 @@ STRATEGIES = {
                "turun ke bawah MA20 lalu close kembali di atasnya (BUY Re-Entry). TP "
                "saat close pertama di bawah MA5 setelah reli, hanya kalau di atas "
                "harga beli. Ini pemantauan, bukan sinyal terbukti."),
-    }),
-    "C": (ut, "ut", {
-        "en": ("UT Bot (1 x ATR100 trailing stop, strict MA20 filter). BUY on a green "
-               "or flat bar that opens at or under yesterday's stop and closes through "
-               "it, or stays within 3% under it as a symmetric doji; never while MA20 "
-               "is below its value 10 days ago. TP on the first close back under MA20 "
-               "after being above it, only above the buy price. CL when the close is "
-               "5% under the buy price. Monitoring, not a proven signal."),
-        "id": ("UT Bot (trailing stop 1 x ATR100, filter MA20 ketat). BUY saat candle "
-               "hijau/flat yang open di bawah atau pas garis kemarin lalu close "
-               "menembus garis, atau doji simetris maksimal 3% di bawah garis; tidak "
-               "pernah BUY saat MA20 lebih rendah dari 10 hari lalu. TP saat close "
-               "pertama kembali di bawah MA20 setelah sempat di atasnya, hanya kalau "
-               "di atas harga beli. CL saat close turun 5% dari harga beli. Ini "
-               "pemantauan, bukan sinyal terbukti."),
     }),
 }
 

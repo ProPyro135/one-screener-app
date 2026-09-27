@@ -47,29 +47,36 @@ PERIOD_LABELS = {
 HI_DATE_LABEL = {"en": "Hi date", "id": "Tgl Hi"}
 #: Earliest date the Custom calendar offers; the full store starts 2016-08-15.
 FIRST_DATE = date(2016, 1, 1)
+#: Owner's broker fees, of the transaction value: 0.15% to buy, 0.25% to sell.
+BUY_FEE = 0.0015
+SELL_FEE = 0.0025
 #: The backtest view lists at most this many trades, newest first. Styling tens
 #: of thousands of rows would lag the page; the summary still counts them all.
 MAX_ROWS = 500
 TEXT = {
     "en": {"view": "VIEW", "now": "Current positions", "bt": "Backtest",
            "trades": "Trades", "tp": "TP", "cl": "CL", "open": "Still open",
-           "win": "Win rate", "avg": "Average P&L",
+           "win": "Win rate", "avg": "Average P&L (gross)",
+           "avg_net": "Average P&L (net of fees)",
            "avg_tp": "Average TP", "avg_cl": "Average CL",
            "none": "No closed trade in this selection.",
            "note": ("Measured on every trade in the selection, bought from {first} to "
-                    "{last}. Gross: broker fees are not deducted. Win rate and P&L count "
-                    "closed trades only (TP + CL). The sleepy-stock filter uses today's "
+                    "{last}. Win rate, TP, CL and gross P&L are before fees; net P&L "
+                    "deducts 0.15% on the buy and 0.25% on the sell. P&L counts closed "
+                    "trades only (TP + CL). The sleepy-stock filter uses today's "
                     "turnover, not the turnover at the time of the trade."),
            "capped": "Showing the newest {shown:,} of {total:,} trades; the summary above counts all of them."},
     "id": {"view": "TAMPILAN", "now": "Posisi terkini", "bt": "Backtest",
            "trades": "Trade", "tp": "TP", "cl": "CL", "open": "Masih open",
-           "win": "Win rate", "avg": "Rata-rata P&L",
+           "win": "Win rate", "avg": "Rata-rata P&L (bruto)",
+           "avg_net": "Rata-rata P&L (net fee)",
            "avg_tp": "Rata-rata TP", "avg_cl": "Rata-rata CL",
            "none": "Tidak ada trade yang sudah selesai di pilihan ini.",
            "note": ("Diukur dari semua trade di pilihan ini, BUY dari {first} sampai "
-                    "{last}. Bruto: fee broker belum dipotong. Win rate dan P&L hanya "
-                    "menghitung trade yang sudah selesai (TP + CL). Filter saham tidur "
-                    "memakai nilai transaksi hari ini, bukan saat trade terjadi."),
+                    "{last}. Win rate, TP, CL dan P&L bruto belum dipotong fee; P&L net "
+                    "sudah dipotong fee beli 0,15% dan jual 0,25%. P&L hanya menghitung "
+                    "trade yang sudah selesai (TP + CL). Filter saham tidur memakai nilai "
+                    "transaksi hari ini, bukan saat trade terjadi."),
            "capped": "Menampilkan {shown:,} trade terbaru dari {total:,}; ringkasan di atas menghitung semuanya."},
 }
 
@@ -219,10 +226,14 @@ def _backtest(log: pd.DataFrame, lang: str, key: str) -> None:
     c[1].metric(tx["tp"], f"{len(tp_pl):,}")
     c[2].metric(tx["cl"], f"{len(cl_pl):,}")
     c[3].metric(tx["win"], f"{(pl > 0).mean() * 100:.1f}%" if len(pl) else "—")
+    # Net of the owner's fees: pay 0.15% on top of the buy, keep 99.75% of
+    # the sell.
+    net = ((1.0 + pl / 100.0) * (1.0 - SELL_FEE) / (1.0 + BUY_FEE) - 1.0) * 100.0
     c = st.columns(4)
     c[0].metric(tx["avg"], avg(pl))
-    c[1].metric(tx["avg_tp"], avg(tp_pl))
-    c[2].metric(tx["avg_cl"], avg(cl_pl))
+    c[1].metric(tx["avg_net"], avg(net))
+    c[2].metric(tx["avg_tp"], avg(tp_pl))
+    c[3].metric(tx["avg_cl"], avg(cl_pl))
     if r.empty:
         st.info(tx["none"])
         return
