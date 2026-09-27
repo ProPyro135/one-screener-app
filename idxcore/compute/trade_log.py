@@ -6,8 +6,8 @@ has it done since. A radar row reading BUY LOW is not news if the entry was in
 May — of the 340 open Market Structure positions on 2026-08-31, only 76 were
 entered within the last week.
 
-``bottom_fishing``, ``market_structure`` and ``reversal_sniper`` are the same
-shape — a state machine
+``bottom_fishing``, ``market_structure``, ``reversal_sniper`` and
+``swing_adaptive`` are the same shape — a state machine
 returning ``(codes, trades, lines)`` with identical trade records — so one
 builder serves them all. Pass the module itself as ``mod``.
 
@@ -158,10 +158,10 @@ def latest(log: pd.DataFrame) -> pd.DataFrame:
 
 def _self_check(db_path: str) -> None:
     """Assert the log's invariants against a real store. See __main__ below."""
-    from idxcore.compute import bottom_fishing, market_structure, reversal_sniper
+    from idxcore.compute import bottom_fishing, market_structure, reversal_sniper, swing_adaptive
 
     con = duckdb.connect(db_path, read_only=True)
-    for mod in (market_structure, reversal_sniper, bottom_fishing):
+    for mod in (market_structure, reversal_sniper, swing_adaptive, bottom_fishing):
         log = build(con, mod)
         cur = latest(log)
         traded = log[log["status"] != WATCHLIST]
@@ -193,7 +193,9 @@ def _self_check(db_path: str) -> None:
         # so a bar that dips through the stop and recovers exits in profit.
         assert (cur[cur["status"] == EXIT]["exit_code"].map(mod.category_of) == "CUT LOSS").all()
         # The owner's rule for the Pine strategies: a take-profit is a profit.
-        if mod is not bottom_fishing:
+        # A strategy whose TP fills at the next open is profitable at the
+        # signal but can gap under the entry by the fill, so it is exempt.
+        if mod is not bottom_fishing and not getattr(mod, "TP_FILLS_NEXT_OPEN", False):
             assert (log.loc[log["status"] == CLOSED, "pl_pct"] > 0).all()
         print(f"{mod.__name__}: {len(log)} trades, {len(cur)} tickers, "
               f"{dict(cur['status'].value_counts())}")
@@ -217,9 +219,9 @@ def publish(full_path: str, slim_path: str) -> int:
     names that failed. ``is_active`` travels with each row so the current-
     status view can still hide them.
     """
-    from idxcore.compute import market_structure, reversal_sniper
+    from idxcore.compute import market_structure, reversal_sniper, swing_adaptive
 
-    strategies = {"A": market_structure, "B": reversal_sniper}
+    strategies = {"A": market_structure, "B": reversal_sniper, "C": swing_adaptive}
     full = duckdb.connect(full_path, read_only=True)
     try:
         active = dict(full.execute("SELECT ticker, is_active FROM tickers").fetchall())
