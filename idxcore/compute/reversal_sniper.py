@@ -168,8 +168,10 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
             # Owner's rule: a take-profit must be a profit. Not in the original
             # Pine; otherwise the position stays open until a real TP or the CL.
             # Measured against the price actually paid: the BUY fills at the
-            # next open (FILL_NEXT_OPEN), not at the signal close.
-            elif siap_tp and c[i] < ma5[i] and c[i] > (o[entry_idx + 1] if entry_idx + 1 < n else entry_price):
+            # next open (FILL_NEXT_OPEN), not at the signal close; on the signal
+            # bar itself nothing has been paid yet, so no TP there.
+            elif (siap_tp and c[i] < ma5[i] and i > entry_idx
+                  and c[i] > o[entry_idx + 1]):
                 exit_code = "TP Smart MA5"
                 can_reentry, dropped = True, False
             if exit_code:

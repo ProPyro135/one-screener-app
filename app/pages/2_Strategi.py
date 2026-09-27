@@ -1,7 +1,7 @@
 """Strategi — the owner's Pine Script strategies, one trade table.
 
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
-IDX Adaptive Swing v3) and the
+IDX Adaptive Swing v4) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -58,22 +58,24 @@ STRATEGIES = {
                "harga beli. Ini pemantauan, bukan sinyal terbukti."),
     }),
     "C": (sa, "sa", {
-        "en": ("IDX Adaptive Swing v3 (end-of-day). The regime (uptrend, sideways, "
-               "downtrend) comes from the last two swing highs and lows; the deeper "
-               "the regime's weakness, the deeper the dip it waits for. BUY on a "
-               "green bar closing above yesterday's high near the 5-day low, on a "
-               "stock trading at least Rp2bn a day, filled at the NEXT day's open. "
-               "TP (Swing High) when Stochastic reaches 80 on a red bar 1% over the "
-               "buy, sold at the next open. CL at the 5-day low minus 3 ATR. "
-               "Monitoring, not a proven signal."),
-        "id": ("IDX Adaptive Swing v3 (EOD). Regime (uptrend, sideways, downtrend) "
-               "dibaca dari dua swing high dan swing low terakhir; makin lemah "
-               "regime-nya, makin dalam koreksi yang ditunggu. BUY saat candle hijau "
-               "close di atas high kemarin, dekat low 5 hari, pada saham dengan nilai "
-               "transaksi minimal Rp2 miliar per hari; dibeli di OPEN BESOKNYA. TP "
-               "(Swing High) saat Stochastic mencapai 80 dengan candle merah dan "
-               "sudah untung 1%, dijual di open besoknya. CL di low 5 hari dikurangi "
-               "3 ATR. Ini pemantauan, bukan sinyal terbukti."),
+        "en": ("IDX Adaptive Swing v4 (end-of-day, preset \"very selective\"). The "
+               "regime (uptrend, sideways, downtrend) comes from the last two swing "
+               "highs and lows. BUY only at a deep swing low: the bottom 10% of the "
+               "60-day range (25% in an uptrend) with low RSI and Stochastic, on a "
+               "green bar closing above yesterday's high, on a stock trading at "
+               "least Rp2bn a day, filled at the NEXT day's open. TP (Swing High) "
+               "when Stochastic reaches 80 on a red bar 1% over the buy, sold at the "
+               "next open. CL at the 5-day low minus 2.5 ATR. Monitoring, not a "
+               "proven signal."),
+        "id": ("IDX Adaptive Swing v4 (EOD, preset \"Sangat selektif\"). Regime "
+               "(uptrend, sideways, downtrend) dibaca dari dua swing high dan swing "
+               "low terakhir. BUY hanya di swing low yang dalam: 10% terbawah range "
+               "60 hari (25% saat uptrend) dengan RSI dan Stochastic rendah, candle "
+               "hijau close di atas high kemarin, saham dengan nilai transaksi "
+               "minimal Rp2 miliar per hari; dibeli di OPEN BESOKNYA. TP (Swing High) "
+               "saat Stochastic mencapai 80 dengan candle merah dan sudah untung 1%, "
+               "dijual di open besoknya. CL di low 5 hari dikurangi 2,5 ATR. Ini "
+               "pemantauan, bukan sinyal terbukti."),
     }),
 }
 

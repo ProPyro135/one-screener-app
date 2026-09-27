@@ -1,6 +1,7 @@
-"""IDX Adaptive Swing v3 strategy (regime-adaptive swing low -> swing high, EOD).
+"""IDX Adaptive Swing v4 strategy (regime-adaptive swing low -> swing high, EOD).
 
-A port of the Pine Script "IDX Adaptive Swing [EOD] v3", in the same shape as
+A port of the Pine Script "IDX Adaptive Swing [EOD] v4" at its default preset
+("Sangat selektif", exit "Seimbang"), in the same shape as
 ``market_structure`` so ``trade_log`` serves it unchanged.
 
 Regime, re-read on every bar from the last two confirmed swing pivots (5/5):
@@ -11,13 +12,13 @@ SIDEWAYS otherwise (and until two of each pivot exist).
     BUY            a green bar closing above yesterday's high, within 2 ATR of
                    the 5-bar low, on a liquid stock (20-bar average turnover
                    >= Rp2bn), deep enough for its regime:
-                     UPTREND   range position <= 60%, EMA50 gap >= -2 ATR,
-                               5-bar RSI low <= 55, 5-bar Stoch low <= 30
-                     SIDEWAYS  ("Longgar") <= 60%, >= -1 ATR, RSI <= 50, Stoch <= 30
-                     DOWNTREND <= 20%, >= +1 ATR, RSI <= 40, Stoch <= 20
+                     UPTREND   range position <= 25%, EMA50 gap >= -2 ATR,
+                               5-bar RSI low <= 40, 5-bar Stoch low <= 25
+                     SIDEWAYS  <= 10%, >= 0 ATR, RSI <= 35, Stoch <= 20
+                     DOWNTREND <= 10%, >= 0 ATR, RSI <= 35, Stoch <= 20
                    Not within 2 bars of the last exit.
     TP Swing High  Stoch(14,3) >= 80 on a red bar closing 1% over the entry
-    CL Stop loss   the 5-bar low at the signal minus 3 ATR, floored to the tick
+    CL Stop loss   the 5-bar low at the signal minus 2.5 ATR, floored to the tick
 
 Execution follows the Pine exactly, since it is written for end-of-day data:
 a signal at a close is filled at the next bar's open (``process_orders_on_close
@@ -51,15 +52,16 @@ RANGE_LEN = 60
 MIN_TURNOVER = 2e9          # Rp2bn average daily value
 COOL = 2                    # bars to wait after an exit
 NEAR_LOW_ATR = 2.0
-SL_ATR = 3.0
+SL_ATR = 2.5              # preset "Sangat selektif"
 X_STOCH = 80.0              # exit mode "Seimbang"
 MIN_PROFIT = 1.0            # % over entry before a swing-high sell
 
 UP, SIDE, DOWN = 1, 2, 3
 REGIME_NAME = {UP: "UPTREND", SIDE: "SIDEWAYS", DOWN: "DOWNTREND"}
 # regime -> (max range position, min EMA gap in ATR, max RSI low, max Stoch low)
-DEPTH = {UP: (0.60, -2.0, 55.0, 30.0), SIDE: (0.60, -1.0, 50.0, 30.0),
-         DOWN: (0.20, 1.0, 40.0, 20.0)}
+# (preset "Sangat selektif", the v4 default)
+DEPTH = {UP: (0.25, -2.0, 40.0, 25.0), SIDE: (0.10, 0.0, 35.0, 20.0),
+         DOWN: (0.10, 0.0, 35.0, 20.0)}
 
 #: The TP is a market order filled at the next open, so a gap down can fill it
 #: under the entry; trade_log's "a TP is a profit" check skips this strategy.
@@ -263,7 +265,7 @@ if __name__ == "__main__":
     f.loc[2, "open"] = 1002.0                                 # fill price
     f.loc[4, ["stk", "open", "close"]] = [85.0, 1030.0, 1020.0]   # red, +1.8% over 1002
     f.loc[5, "open"] = 1015.0                                 # sell fills here
-    f.loc[10, "low"] = 940.0                                  # stop 980-30 = 950 -> 950
+    f.loc[10, "low"] = 940.0                                  # stop 980-25 = 955 -> 955
     import sys
     this = sys.modules[__name__]
     real_setup, this._setup = _setup, (lambda _df: forced)
@@ -274,6 +276,6 @@ if __name__ == "__main__":
     assert fired == [(2, "BUY UPTREND"), (5, "TP Swing High"), (9, "BUY UPTREND"),
                      (10, "CL Stop loss")], fired
     assert trades[0]["entry_price"] == 1002.0 and trades[0]["exit_price"] == 1015.0, trades[0]
-    assert trades[1]["exit_price"] == 950.0, trades[1]
+    assert trades[1]["exit_price"] == 955.0, trades[1]
     assert not any(lines["setup"])
     print("swing_adaptive self-check ok:", fired)
