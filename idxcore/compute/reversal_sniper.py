@@ -36,6 +36,10 @@ ATR_LEN = 14
 REENTRY_LOW_BARS = 7
 CL_BUFFER = 0.99
 
+#: Signals are decided at the close; with end-of-day data the orders fill at
+#: the next open (trade_log.next_open_fills), so a TP can gap under the entry.
+FILL_NEXT_OPEN = True
+
 MIN_BARS = BOTTOM_LOOKBACK  # is_bottom needs a full 50-bar window
 
 CATEGORY = {"BUY": "BUY", "TP": "TAKE PROFIT", "CL": "CUT LOSS"}
@@ -81,6 +85,7 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
     h = pd.to_numeric(df["high"], errors="coerce").to_numpy(float)
     lo = pd.to_numeric(df["low"], errors="coerce").to_numpy(float)
     c = pd.to_numeric(df["close"], errors="coerce").to_numpy(float)
+    o = pd.to_numeric(df["open"], errors="coerce").to_numpy(float)
     ma5 = df["ma5"].to_numpy(float)
     ma20 = df["ma20"].to_numpy(float)
     atr = df["atr"].to_numpy(float)
@@ -162,7 +167,9 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
                 can_reentry = dropped = False
             # Owner's rule: a take-profit must be a profit. Not in the original
             # Pine; otherwise the position stays open until a real TP or the CL.
-            elif siap_tp and c[i] < ma5[i] and c[i] > entry_price:
+            # Measured against the price actually paid: the BUY fills at the
+            # next open (FILL_NEXT_OPEN), not at the signal close.
+            elif siap_tp and c[i] < ma5[i] and c[i] > (o[entry_idx + 1] if entry_idx + 1 < n else entry_price):
                 exit_code = "TP Smart MA5"
                 can_reentry, dropped = True, False
             if exit_code:

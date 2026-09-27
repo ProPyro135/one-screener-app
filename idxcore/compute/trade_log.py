@@ -74,9 +74,8 @@ def turnover(con: duckdb.DuckDBPyConnection, bars: int = TURNOVER_BARS) -> pd.Se
 def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
     entry = float(t["entry_price"])
     running = not t["resolved"]
-    # Highest high the trade actually saw: from H+1 through the exit bar. The
-    # entry fills at the entry bar's close, so that bar's high came before the
-    # buy. For a running trade the machine sets exit_date to the last bar; one
+    # Highest high the trade actually saw: from H+1 (the bar after the BUY
+    # date) through the exit bar, the owner's definition. For a running trade the machine sets exit_date to the last bar; one
     # bought on the last bar has no peak yet (NaN).
     span = (g["date"] > t["entry_date"]) & (g["date"] <= t["exit_date"])
     # max(high, close): a few stored bars are flagged impossible_bar (close
@@ -107,6 +106,43 @@ def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
     return row
 
 
+def next_open_fills(trades: list[dict], g: pd.DataFrame) -> tuple[list[dict], bool]:
+    """Re-fill a close-signalled machine's trades the way end-of-day data allows.
+
+    The machine decides at each close; with EOD data the order can only go in
+    for the next session, so every BUY and every TP/CL fills at the next bar's
+    open (as a Pine ``strategy.entry`` / ``strategy.close`` does with
+    ``process_orders_on_close = false``). A BUY signalled at the last close is
+    not filled yet: the trade is dropped and ``True`` is returned, so the
+    caller shows a WATCHLIST row. An exit signalled at the last close has not
+    filled either: the trade stays OPEN at today's close.
+    """
+    dates = g["date"].to_numpy()
+    opens = pd.to_numeric(g["open"], errors="coerce").to_numpy(float)
+    closes = pd.to_numeric(g["close"], errors="coerce").to_numpy(float)
+    pos = {d: i for i, d in enumerate(pd.to_datetime(dates))}
+    last = len(dates) - 1
+    out, pending_buy = [], False
+    for t in trades:
+        i = pos[pd.Timestamp(t["entry_date"])]
+        if i == last:
+            pending_buy = True
+            continue
+        t = dict(t, entry_date=dates[i + 1], entry_price=float(opens[i + 1]))
+        j = pos[pd.Timestamp(t["exit_date"])] if t["resolved"] else last
+        if t["resolved"] and j < last:
+            t.update(exit_date=dates[j + 1], exit_price=float(opens[j + 1]))
+            j += 1
+        else:
+            t.update(exit_date=dates[last], exit_price=float(closes[last]),
+                     exit_code="OPEN", resolved=False)
+            j = last
+        t["bars_held"] = j - (i + 1)
+        t["gross_return_pct"] = (t["exit_price"] / t["entry_price"] - 1.0) * 100.0
+        out.append(t)
+    return out, pending_buy
+
+
 def build(
     con: duckdb.DuckDBPyConnection,
     mod,
@@ -128,6 +164,9 @@ def build(
             continue
         g = g.sort_values("date").reset_index(drop=True)
         _, trades, lines = mod.run_state_machine(mod.prepare(g))
+        pending_buy = False
+        if getattr(mod, "FILL_NEXT_OPEN", False):
+            trades, pending_buy = next_open_fills(trades, g)
         idx_code, name = meta.get(ticker, (ticker, None))
         base = {
             "ticker": ticker, "idx_code": idx_code, "name": name,
@@ -136,10 +175,12 @@ def build(
         }
         for t in trades:
             rows.append(_trade_row(base, t, mod, g))
-        # Flat with a setup armed: nothing was bought, so it is a watchlist row
-        # rather than a trade. The two modules name the flag differently.
+        # Flat with a setup armed, or a BUY signalled at the last close and not
+        # filled yet: nothing was bought, so it is a watchlist row rather than
+        # a trade. The modules name the setup flag differently.
         armed = lines.get("pantau") or lines.get("setup")
-        if lines["position"][-1] == 0 and armed and armed[-1]:
+        holding = any(not t["resolved"] for t in trades)
+        if not holding and (pending_buy or (lines["position"][-1] == 0 and armed and armed[-1])):
             rows.append({**base, "status": WATCHLIST, "pb": "P"})
 
     return pd.DataFrame(rows, columns=COLUMNS)
@@ -156,8 +197,27 @@ def latest(log: pd.DataFrame) -> pd.DataFrame:
     return log.groupby("ticker", sort=False).tail(1).reset_index(drop=True)
 
 
+def _check_next_open_fills() -> None:
+    """next_open_fills on hand-built bars: fills move to the next open; a BUY
+    at the last close is pending; an exit at the last close stays OPEN."""
+    g = pd.DataFrame({"date": pd.date_range("2024-01-01", periods=6, freq="D"),
+                      "open": [10.0, 11, 12, 13, 14, 15], "close": [10.5, 11.5, 12.5, 13.5, 14.5, 15.5]})
+    d = g["date"].to_numpy()
+    closed = {"entry_date": d[0], "entry_price": 10.5, "entry_code": "BUY", "exit_date": d[2],
+              "exit_price": 12.5, "exit_code": "TP", "bars_held": 2, "gross_return_pct": 0.0,
+              "resolved": True}
+    exit_today = dict(closed, entry_date=d[3], exit_date=d[5])
+    buy_today = dict(closed, entry_date=d[5], exit_date=d[5], resolved=False, exit_code="OPEN")
+    out, pending = next_open_fills([closed, exit_today, buy_today], g)
+    assert pending and len(out) == 2
+    assert out[0]["entry_price"] == 11.0 and out[0]["exit_price"] == 13.0, out[0]
+    assert pd.Timestamp(out[0]["entry_date"]) == pd.Timestamp(d[1]) and out[0]["bars_held"] == 2
+    assert out[1]["entry_price"] == 14.0 and not out[1]["resolved"] and out[1]["exit_price"] == 15.5
+
+
 def _self_check(db_path: str) -> None:
     """Assert the log's invariants against a real store. See __main__ below."""
+    _check_next_open_fills()
     from idxcore.compute import bottom_fishing, market_structure, reversal_sniper, swing_adaptive
 
     con = duckdb.connect(db_path, read_only=True)
@@ -195,7 +255,8 @@ def _self_check(db_path: str) -> None:
         # The owner's rule for the Pine strategies: a take-profit is a profit.
         # A strategy whose TP fills at the next open is profitable at the
         # signal but can gap under the entry by the fill, so it is exempt.
-        if mod is not bottom_fishing and not getattr(mod, "TP_FILLS_NEXT_OPEN", False):
+        next_open = getattr(mod, "TP_FILLS_NEXT_OPEN", False) or getattr(mod, "FILL_NEXT_OPEN", False)
+        if mod is not bottom_fishing and not next_open:
             assert (log.loc[log["status"] == CLOSED, "pl_pct"] > 0).all()
         print(f"{mod.__name__}: {len(log)} trades, {len(cur)} tickers, "
               f"{dict(cur['status'].value_counts())}")

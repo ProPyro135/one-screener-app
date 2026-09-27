@@ -43,6 +43,10 @@ VOLATILE_LOOKBACK = 40
 VOLATILE_RANGE_PCT = 30.0
 REQUIRE_PANTAU_FIRST = False
 
+#: Signals are decided at the close; with end-of-day data the orders fill at
+#: the next open (trade_log.next_open_fills), so a TP can gap under the entry.
+FILL_NEXT_OPEN = True
+
 MIN_BARS = 45  # need the 40-bar volatility window + a pivot to say anything
 
 REASON_MAP = {
@@ -210,8 +214,11 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
             )
             top_reversal = c[i] < o[i] and i > 0 and c[i] < lo[i - 1]
             # Owner's rule: a take-profit must be a profit. The original Pine
-            # let a reversal below the entry count as SELL HIGH.
-            if reached_target and top_reversal and c[i] > entry_price:
+            # let a reversal below the entry count as SELL HIGH. Measured
+            # against the price actually paid: the BUY fills at the next open
+            # (FILL_NEXT_OPEN), not at the signal close.
+            paid = o[entry_idx + 1] if entry_idx + 1 < n else entry_price
+            if reached_target and top_reversal and c[i] > paid:
                 codes[i] = "SELL HIGH"
             elif not np.isnan(initial_sl) and c[i] < initial_sl:
                 codes[i] = "SL"
