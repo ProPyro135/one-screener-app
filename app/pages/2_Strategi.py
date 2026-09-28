@@ -2,7 +2,7 @@
 
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
 Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
-Breakout, F = Early Entry & Hard TP) and the
+Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import trade_table  # noqa: E402
 from idxcore.compute import accumulation_breakout as ab  # noqa: E402
 from idxcore.compute import advanced_breakout as adv  # noqa: E402
+from idxcore.compute import buy_the_dip as btd  # noqa: E402
 from idxcore.compute import early_entry as ee  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
 from idxcore.compute import pattern_breakout as pb  # noqa: E402
@@ -134,6 +135,26 @@ STRATEGIES = {
                "hanya naik. Keduanya berlaku intraday mulai sehari setelah beli; "
                "kalau satu hari menyentuh keduanya, dihitung kena stop. Stop di "
                "atas harga beli dihitung TP. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+    "G": (btd, "btd", {
+        "en": ("Uptrend Buy The Dip (MA20 > MA50). BUY on a golden cross (MA20 "
+               "crossing over MA50), then while MA20 stays over MA50, BUY again on "
+               "every dip: the low touches MA20, the close stays over MA50, on a "
+               "green candle. Up to 5 buys stacked, at least 5 days apart; each buy "
+               "is its own row. All filled at the NEXT day's open. No fixed target: "
+               "everything is sold at the next open after a close under the "
+               "trailing stop (close minus 3 ATR, only rising) or MA20 crossing "
+               "under MA50. A row sold above its buy price counts as TP, otherwise "
+               "as CL. Monitoring, not a proven signal."),
+        "id": ("Uptrend Buy The Dip (MA20 > MA50). BUY saat golden cross (MA20 "
+               "memotong ke atas MA50), lalu selama MA20 di atas MA50, BUY lagi di "
+               "setiap dip: low menyentuh MA20, close tetap di atas MA50, candle "
+               "hijau. Maks 5 pembelian bertumpuk, jarak minimal 5 hari; tiap "
+               "pembelian satu baris. Semua dibeli di OPEN BESOKNYA. Tanpa target "
+               "tetap: semua dijual di open besoknya setelah close di bawah trailing "
+               "stop (close dikurangi 3 ATR, hanya naik) atau MA20 memotong ke bawah "
+               "MA50. Baris yang terjual di atas harga belinya dihitung TP, selain "
+               "itu CL. Ini pemantauan, bukan sinyal terbukti."),
     }),
 }
 
