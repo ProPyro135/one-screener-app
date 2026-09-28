@@ -1,7 +1,8 @@
 """Strategi — the owner's Pine Script strategies, one trade table.
 
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
-IDX Adaptive Swing v4) and the
+Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
+Breakout, F = Early Entry & Hard TP) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -22,9 +23,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import trade_table  # noqa: E402
+from idxcore.compute import accumulation_breakout as ab  # noqa: E402
+from idxcore.compute import advanced_breakout as adv  # noqa: E402
+from idxcore.compute import early_entry as ee  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
+from idxcore.compute import pattern_breakout as pb  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
-from idxcore.compute import swing_adaptive as sa  # noqa: E402
 from idxcore.compute import trade_log as tl  # noqa: E402
 from idxcore.i18n import LANGUAGES, default_language, t  # noqa: E402
 from idxcore.store import db  # noqa: E402
@@ -57,25 +61,79 @@ STRATEGIES = {
                "saat close pertama di bawah MA5 setelah reli, hanya kalau di atas "
                "harga beli. Ini pemantauan, bukan sinyal terbukti."),
     }),
-    "C": (sa, "sa", {
-        "en": ("IDX Adaptive Swing v4 (end-of-day, preset \"very selective\"). The "
-               "regime (uptrend, sideways, downtrend) comes from the last two swing "
-               "highs and lows. BUY only at a deep swing low: the bottom 10% of the "
-               "60-day range (25% in an uptrend) with low RSI and Stochastic, on a "
-               "green bar closing above yesterday's high, on a stock trading at "
-               "least Rp2bn a day, filled at the NEXT day's open. TP (Swing High) "
-               "when Stochastic reaches 80 on a red bar 1% over the buy, sold at the "
-               "next open. CL at the 5-day low minus 2.5 ATR. Monitoring, not a "
-               "proven signal."),
-        "id": ("IDX Adaptive Swing v4 (EOD, preset \"Sangat selektif\"). Regime "
-               "(uptrend, sideways, downtrend) dibaca dari dua swing high dan swing "
-               "low terakhir. BUY hanya di swing low yang dalam: 10% terbawah range "
-               "60 hari (25% saat uptrend) dengan RSI dan Stochastic rendah, candle "
-               "hijau close di atas high kemarin, saham dengan nilai transaksi "
-               "minimal Rp2 miliar per hari; dibeli di OPEN BESOKNYA. TP (Swing High) "
-               "saat Stochastic mencapai 80 dengan candle merah dan sudah untung 1%, "
-               "dijual di open besoknya. CL di low 5 hari dikurangi 2,5 ATR. Ini "
+    "C": (pb, "pb", {
+        "en": ("Pattern Breakout: VCP and Double Bottom. VCP: a base of 2+ ever "
+               "shallower pullbacks (first at most 35%, last at most 10%) in a "
+               "Minervini uptrend, with volume drying up. Double Bottom: two swing "
+               "lows within 4% of each other under a neckline. BUY on a close "
+               "through the pivot or neckline (at most 5% over it) on 1.5x volume, "
+               "on a stock trading at least Rp5bn a day, filled at the NEXT day's "
+               "open. Stop at the pattern low, at most 8% under. TP: half the "
+               "position at 2x the risk, then the stop moves to the buy price and "
+               "the rest is sold after a close under EMA21; P&L is the average of "
+               "both halves. CL: the stop. Monitoring, not a proven signal."),
+        "id": ("Pattern Breakout: VCP dan Double Bottom. VCP: base dengan 2+ koreksi "
+               "yang makin dangkal (pertama maks 35%, terakhir maks 10%) dalam "
+               "uptrend Minervini, volume mengering. Double Bottom: dua swing low "
+               "setara (selisih maks 4%) di bawah neckline. BUY saat close menembus "
+               "pivot atau neckline (maks 5% di atasnya) dengan volume 1,5x, saham "
+               "dengan nilai transaksi minimal Rp5 miliar per hari; dibeli di OPEN "
+               "BESOKNYA. Stop di low pola, maks 8% di bawah. TP: separuh posisi "
+               "dijual di 2x risiko, lalu stop digeser ke harga beli dan sisanya "
+               "dijual setelah close di bawah EMA21; P&L adalah rata-rata kedua "
+               "bagian. CL: kena stop. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+    "D": (ab, "ab", {
+        "en": ("Accumulation Breakout & Trend Run. Accumulation: the last 25 days "
+               "moved within a 15% range, near or above EMA50. BUY on a close "
+               "through that range's high on 1.3x volume, filled at the NEXT day's "
+               "open. No fixed target: a trailing stop (highest high since the buy "
+               "minus 3 ATR) follows the run, and a close under it sells at the "
+               "next open. Sold above the buy price it counts as TP, otherwise as "
+               "CL. Monitoring, not a proven signal."),
+        "id": ("Accumulation Breakout & Trend Run. Akumulasi: 25 hari terakhir "
+               "bergerak dalam range maks 15%, dekat atau di atas EMA50. BUY saat "
+               "close menembus high range itu dengan volume 1,3x; dibeli di OPEN "
+               "BESOKNYA. Tanpa target tetap: trailing stop (high tertinggi sejak "
+               "beli dikurangi 3 ATR) mengikuti kenaikan, dan close di bawahnya "
+               "dijual di open besoknya. Terjual di atas harga beli dihitung TP, "
+               "selain itu CL. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+    "E": (adv, "adv", {
+        "en": ("Advanced Breakout, a stricter D. Base: the last 20 days moved within "
+               "a 12% range, above EMA200. BUY on a close through that range's high "
+               "on 1.5x the 50-day volume, closing in the top 30% of its candle, "
+               "filled at the NEXT day's open. The stop starts at the higher of the "
+               "close minus 4 ATR and the base low, then trails the highest high "
+               "since the buy minus 4 ATR; a close under it sells at the next open. "
+               "Sold above the buy price it counts as TP, otherwise as CL. "
+               "Monitoring, not a proven signal."),
+        "id": ("Advanced Breakout, versi D yang lebih ketat. Base: 20 hari terakhir "
+               "bergerak dalam range maks 12%, di atas EMA200. BUY saat close menembus "
+               "high range itu dengan volume 1,5x rata-rata 50 hari dan close di 30% "
+               "teratas candle; dibeli di OPEN BESOKNYA. Stop awal: yang lebih tinggi "
+               "dari close dikurangi 4 ATR dan low base, lalu mengikuti high tertinggi "
+               "sejak beli dikurangi 4 ATR; close di bawahnya dijual di open "
+               "besoknya. Terjual di atas harga beli dihitung TP, selain itu CL. Ini "
                "pemantauan, bukan sinyal terbukti."),
+    }),
+    "F": (ee, "ee", {
+        "en": ("Early Entry & Hard TP. Base: the last 20 days moved within a 15% "
+               "range, above EMA100. BUY early, on a close through the 10-day high "
+               "on 1.5x the 50-day volume, closing in the top 40% of its candle, "
+               "filled at the NEXT day's open. TP: the whole position at +10% over "
+               "the buy. Stop: the highest high since the buy minus 3 ATR, only "
+               "rising. Both work intraday from the day after the buy; when a day "
+               "touches both, the stop counts. A stop above the buy price counts "
+               "as TP. Monitoring, not a proven signal."),
+        "id": ("Early Entry & Hard TP. Base: 20 hari terakhir bergerak dalam range "
+               "maks 15%, di atas EMA100. BUY lebih awal, saat close menembus high "
+               "10 hari dengan volume 1,5x rata-rata 50 hari dan close di 40% "
+               "teratas candle; dibeli di OPEN BESOKNYA. TP: seluruh posisi di +10% "
+               "dari harga beli. Stop: high tertinggi sejak beli dikurangi 3 ATR, "
+               "hanya naik. Keduanya berlaku intraday mulai sehari setelah beli; "
+               "kalau satu hari menyentuh keduanya, dihitung kena stop. Stop di "
+               "atas harga beli dihitung TP. Ini pemantauan, bukan sinyal terbukti."),
     }),
 }
 

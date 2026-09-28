@@ -6,8 +6,9 @@ has it done since. A radar row reading BUY LOW is not news if the entry was in
 May — of the 340 open Market Structure positions on 2026-08-31, only 76 were
 entered within the last week.
 
-``bottom_fishing``, ``market_structure``, ``reversal_sniper`` and
-``swing_adaptive`` are the same shape — a state machine
+``bottom_fishing``, ``market_structure``, ``reversal_sniper``,
+``pattern_breakout``, ``accumulation_breakout``, ``advanced_breakout`` and
+``early_entry`` are the same shape — a state machine
 returning ``(codes, trades, lines)`` with identical trade records — so one
 builder serves them all. Pass the module itself as ``mod``.
 
@@ -218,10 +219,13 @@ def _check_next_open_fills() -> None:
 def _self_check(db_path: str) -> None:
     """Assert the log's invariants against a real store. See __main__ below."""
     _check_next_open_fills()
-    from idxcore.compute import bottom_fishing, market_structure, reversal_sniper, swing_adaptive
+    from idxcore.compute import (accumulation_breakout, advanced_breakout, bottom_fishing,
+                                 early_entry, market_structure, pattern_breakout,
+                                 reversal_sniper)
 
     con = duckdb.connect(db_path, read_only=True)
-    for mod in (market_structure, reversal_sniper, swing_adaptive, bottom_fishing):
+    for mod in (market_structure, reversal_sniper, pattern_breakout, accumulation_breakout,
+                advanced_breakout, early_entry, bottom_fishing):
         log = build(con, mod)
         cur = latest(log)
         traded = log[log["status"] != WATCHLIST]
@@ -236,9 +240,11 @@ def _self_check(db_path: str) -> None:
         assert (cur[cur["status"] != WATCHLIST]["pb"] == "B").all()
         assert cur[cur["status"] == WATCHLIST]["buy_price"].isna().all()
         # The peak is taken over the trade's own bars, so it cannot sit below
-        # the price the trade exited at.
-        assert (traded["max_fl_pct"].isna()
-                | (traded["max_fl_pct"] >= traded["pl_pct"].fillna(-1e9) - 1e-9)).all()
+        # the price the trade exited at. Except where part of the position is
+        # sold on the BUY bar itself, which the H+1 peak does not cover.
+        if not getattr(mod, "PARTIAL_EXIT_ON_ENTRY_BAR", False):
+            assert (traded["max_fl_pct"].isna()
+                    | (traded["max_fl_pct"] >= traded["pl_pct"].fillna(-1e9) - 1e-9)).all()
         # H+1 onward: no peak for a trade bought on the last bar, or one that
         # exited on its own entry bar (Reversal Sniper checks its CL there).
         no_peak = traded[traded["max_fl_pct"].isna()]
@@ -280,9 +286,11 @@ def publish(full_path: str, slim_path: str) -> int:
     names that failed. ``is_active`` travels with each row so the current-
     status view can still hide them.
     """
-    from idxcore.compute import market_structure, reversal_sniper, swing_adaptive
+    from idxcore.compute import (accumulation_breakout, advanced_breakout, early_entry,
+                                 market_structure, pattern_breakout, reversal_sniper)
 
-    strategies = {"A": market_structure, "B": reversal_sniper, "C": swing_adaptive}
+    strategies = {"A": market_structure, "B": reversal_sniper, "C": pattern_breakout,
+                  "D": accumulation_breakout, "E": advanced_breakout, "F": early_entry}
     full = duckdb.connect(full_path, read_only=True)
     try:
         active = dict(full.execute("SELECT ticker, is_active FROM tickers").fetchall())
