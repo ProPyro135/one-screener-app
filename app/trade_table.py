@@ -50,17 +50,26 @@ RANGE_OPS = ["any", "ge", "le", "between"]
 RANGE_TEXT = {
     "en": {"any": "All", "ge": "≥", "le": "≤", "between": "Between", "from": "From", "to": "To",
            "price": "BUY price (Rp)", "turn": "Avg. daily value (Rp mn)",
+           "mcap": "Market cap (Rp bn)",
            "price_help": "The BUY price; a watchlist row uses today's price.",
-           "turn_help": "Average daily traded value over the last 60 days, in Rp million."},
+           "turn_help": "Average daily traded value over the last 60 days, in Rp million.",
+           "mcap_help": ("Today's market cap in Rp billion: listed shares (IDX Ringkasan "
+                         "Saham file) x the last close. Stocks with no share count are kept.")},
     "id": {"any": "Semua", "ge": "≥", "le": "≤", "between": "Antara", "from": "Dari", "to": "Sampai",
            "price": "Harga BUY (Rp)", "turn": "Nilai transaksi/hari (Rp jt)",
+           "mcap": "Market cap (Rp M)",
            "price_help": "Harga BUY; baris watchlist memakai harga hari ini.",
-           "turn_help": "Rata-rata nilai transaksi harian 60 hari terakhir, dalam juta rupiah."},
+           "turn_help": "Rata-rata nilai transaksi harian 60 hari terakhir, dalam juta rupiah.",
+           "mcap_help": ("Market cap hari ini dalam miliar rupiah: jumlah saham tercatat (file "
+                         "Ringkasan Saham IDX) x harga penutupan terakhir. Saham tanpa data "
+                         "jumlah saham tetap ditampilkan.")},
 }
 #: Owner's defaults: BUY price >= Rp60, and skip sleepy stocks (the old
 #: checkbox, now value >= Rp100 mn a day).
 PRICE_DEFAULT = ("ge", 60.0, 100.0)
 TURN_DEFAULT = ("ge", tl.SLEEPY_TURNOVER / 1e6, 1000.0)
+MCAP_DEFAULT = ("any", 1000.0, 10000.0)
+MCAP_COL = {"en": "Mkt cap (Rp bn)", "id": "Mkt cap (Rp M)"}
 #: Earliest date the Custom calendar offers; the full store starts 2016-08-15.
 FIRST_DATE = date(2016, 1, 1)
 #: Owner's broker fees, of the transaction value: 0.15% to buy, 0.25% to sell.
@@ -139,8 +148,11 @@ def _filters(
     keep_price = _range_filter(cur["buy_price"].fillna(cur["last_close"]), rt, "price",
                                PRICE_DEFAULT, f"{key}_price")
     keep_turn = _range_filter(cur["turnover"] / 1e6, rt, "turn", TURN_DEFAULT, f"{key}_turn")
+    # Absent from a trade log published before market cap existed.
+    mcap = cur["mcap"] if "mcap" in cur else pd.Series(float("nan"), index=cur.index)
+    keep_mcap = _range_filter(mcap / 1e9, rt, "mcap", MCAP_DEFAULT, f"{key}_mcap")
 
-    r = cur[keep_price & keep_turn]
+    r = cur[keep_price & keep_turn & keep_mcap]
     # A half-picked range is one date; leave the rows alone until both are set.
     if isinstance(span, (tuple, list)) and len(span) == 2:
         lo, hi = pd.Timestamp(span[0]), pd.Timestamp(span[1])
@@ -189,6 +201,7 @@ def _style(frame: pd.DataFrame, lang: str):
         t("tl_pb", lang): frame["pb"],
         t("tl_buy_price", lang): frame["buy_price"],
         t("tl_last", lang): frame["last_close"],
+        MCAP_COL.get(lang, MCAP_COL["en"]): frame.get("mcap", pd.Series(float("nan"), index=frame.index)) / 1e9,
         t("tl_fl", lang): frame["fl_pct"],
         t("tl_hi", lang): frame["hi_price"],
         # Absent from a trade log published before the column existed.
@@ -202,7 +215,7 @@ def _style(frame: pd.DataFrame, lang: str):
     })
     pct_cols = [t("tl_fl", lang), t("tl_max_fl", lang), t("tl_pl", lang)]
     price_cols = [t("tl_buy_price", lang), t("tl_last", lang),
-                  t("tl_hi", lang), t("tl_exit_price", lang)]
+                  t("tl_hi", lang), t("tl_exit_price", lang), MCAP_COL.get(lang, MCAP_COL["en"])]
 
     def paint_status(v):
         colour = STATUS_COLOUR.get(v)

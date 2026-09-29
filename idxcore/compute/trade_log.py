@@ -49,7 +49,7 @@ SLEEPY_TURNOVER = 100_000_000.0
 COLUMNS = [
     "ticker", "idx_code", "name", "status", "buy_date", "pb", "buy_price",
     "last_close", "fl_pct", "hi_price", "hi_date", "max_fl_pct", "exit_date", "exit_price",
-    "pl_pct", "entry_code", "exit_code", "turnover",
+    "pl_pct", "entry_code", "exit_code", "turnover", "mcap",
 ]
 
 
@@ -71,6 +71,20 @@ def turnover(con: duckdb.DuckDBPyConnection, bars: int = TURNOVER_BARS) -> pd.Se
         [bars],
     ).df()
     return frame.set_index("ticker")["turnover"]
+
+
+def listed_shares(con: duckdb.DuckDBPyConnection) -> pd.Series:
+    """Latest listed-share count per ticker (IDX Ringkasan Saham), for market
+    cap. Empty on a store that has never imported one."""
+    has = con.execute(
+        "SELECT count(*) FROM information_schema.tables WHERE table_name = 'listed_shares'"
+    ).fetchone()[0]
+    if not has:
+        return pd.Series(dtype=float)
+    frame = con.execute(
+        "SELECT ticker, arg_max(shares, as_of) AS shares FROM listed_shares GROUP BY 1"
+    ).df()
+    return frame.set_index("ticker")["shares"].astype(float)
 
 
 def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
@@ -159,6 +173,7 @@ def build(
     bars = mod._all_bars(con, tickers)
     meta = mod._ticker_meta(con)
     turn = turnover(con)
+    shares = listed_shares(con)
     rows: list[dict] = []
 
     for ticker, g in bars.groupby("ticker", sort=True):
@@ -174,6 +189,8 @@ def build(
             "ticker": ticker, "idx_code": idx_code, "name": name,
             "last_close": float(g["close"].iloc[-1]),
             "turnover": float(turn.get(ticker, float("nan"))),
+            # Today's market cap: latest listed shares x last close.
+            "mcap": float(shares.get(ticker, float("nan"))) * float(g["close"].iloc[-1]),
         }
         for t in trades:
             rows.append(_trade_row(base, t, mod, g))
