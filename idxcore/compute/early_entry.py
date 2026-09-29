@@ -78,7 +78,6 @@ def prepare(history: pd.DataFrame) -> pd.DataFrame:
     vol_ok = vol >= vol.rolling(50, min_periods=50).mean() * VOL_MULT
     strong = close >= low + (high - low) * 0.6
     df["signal"] = cross & accum.shift(1, fill_value=False) & vol_ok & strong
-    df["range_low"] = range_low      # strategy I's first stop
     return df
 
 

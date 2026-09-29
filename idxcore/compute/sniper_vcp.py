@@ -1,12 +1,16 @@
-"""Ultimate Pro strategy (strategy I, EOD).
+"""Sniper VCP strategy (strategy I, EOD).
 
-A port of the Pine Script "Market Structure: Ultimate Pro". Entries are
-PINESCRIPT F's (``early_entry``); the exit:
+A port of the Pine Script "Market Structure: Sniper VCP".
 
-    First stop     the higher of the base low and the signal close - 6%
+    Base           the prior 40 bars span <= 12% of their low, in a Minervini
+                   stage 2 (close > EMA50 > EMA150 > EMA200)
+    BUY Sniper     a close crossing over the prior 20-bar high, the bar after
+                   a base bar, on volume >= 2x its 50-bar average, closing in
+                   the top 30% of its bar
+    First stop     the higher of the base low and the signal close - 5.5%
     Trailing       once the highest high since the signal reaches the buy
                    price + 5%, the stop is at least that high - 3%, only rising
-    TP             the whole position at the buy price + 15%
+    TP             the whole position at the buy price + 20%
     Time stop      10 bars after the signal, if the trailing never switched
                    on, sold at the next open
 
@@ -19,7 +23,7 @@ the entry price, the stop, the running high and the entry bar on the signal
 bar, and all of them are only set on a signal bar, so every exit stays
 ``na``. Ported as its comments intend instead, with the buy price taken as the
 actual fill (the next open) so a TP is always over the price paid. The Pine's
-20% sizing and 0.25% commission are not ported; the page's fee model applies.
+20% sizing and 0.2% commission are not ported; the page's fee model applies.
 
 A sale over the buy price counts as TP, otherwise as CL.
 
@@ -31,12 +35,37 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from idxcore.compute.early_entry import MIN_BARS, _all_bars, _ticker_meta, category_of, prepare  # noqa: F401
+from idxcore.compute.early_entry import _all_bars, _ticker_meta, category_of  # noqa: F401
 
-TP_PCT = 15.0
-MAX_SL_PCT = 6.0
+ACCUM_LEN, MICRO_LEN, MAX_BOX_PCT, VOL_MULT = 40, 20, 12.0, 2.0
+TP_PCT = 20.0
+MAX_SL_PCT = 5.5
 TRAIL_ON_PCT, TRAIL_OFFSET_PCT = 5.0, 3.0
 MAX_HOLD = 10
+
+MIN_BARS = 201  # EMA200
+
+
+def prepare(history: pd.DataFrame) -> pd.DataFrame:
+    """Stage 2 EMAs, the 40-bar base, the 20-bar breakout and volume."""
+    df = history.sort_values("date").reset_index(drop=True).copy()
+    close = pd.to_numeric(df["close"], errors="coerce")
+    high = pd.to_numeric(df["high"], errors="coerce")
+    low = pd.to_numeric(df["low"], errors="coerce")
+    vol = pd.to_numeric(df["volume"], errors="coerce")
+
+    ema = {n: close.ewm(span=n, adjust=False, min_periods=n).mean() for n in (50, 150, 200)}
+    stage2 = (close > ema[50]) & (ema[50] > ema[150]) & (ema[150] > ema[200])
+    range_high = high.shift(1).rolling(ACCUM_LEN, min_periods=ACCUM_LEN).max()
+    range_low = low.shift(1).rolling(ACCUM_LEN, min_periods=ACCUM_LEN).min()
+    accum = ((range_high - range_low) / range_low * 100 <= MAX_BOX_PCT) & stage2
+    micro = high.shift(1).rolling(MICRO_LEN, min_periods=MICRO_LEN).max()
+    cross = (close > micro) & (close.shift(1) <= micro.shift(1))
+    vol_ok = vol >= vol.rolling(50, min_periods=50).mean() * VOL_MULT
+    strong = close >= low + (high - low) * 0.7
+    df["signal"] = cross & accum.shift(1, fill_value=False) & vol_ok & strong
+    df["range_low"] = range_low
+    return df
 
 
 def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
@@ -65,7 +94,7 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
         codes[i] = code
         trades.append({
             "entry_date": entry_date, "entry_price": entry_price,
-            "entry_code": "BUY Early", "exit_date": dates[i],
+            "entry_code": "BUY Sniper", "exit_date": dates[i],
             "exit_price": price, "exit_code": code, "bars_held": i - entry_idx,
             "gross_return_pct": (price / entry_price - 1.0) * 100.0, "resolved": True,
         })
@@ -78,7 +107,7 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
         if pending_buy:
             pending_buy, in_pos, orders, trailing = False, True, False, False
             entry_price, entry_date, entry_idx = o[i], dates[i], i
-            codes[i] = "BUY Early"
+            codes[i] = "BUY Sniper"
         # 2. Resting exits, placed at an earlier close. The stop first.
         if in_pos and orders:
             tp = entry_price * (1 + TP_PCT / 100)
@@ -106,7 +135,7 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
         last = n - 1
         trades.append({
             "entry_date": entry_date, "entry_price": entry_price,
-            "entry_code": "BUY Early", "exit_date": dates[last],
+            "entry_code": "BUY Sniper", "exit_date": dates[last],
             "exit_price": c[last], "exit_code": "OPEN", "bars_held": last - entry_idx,
             "gross_return_pct": (c[last] / entry_price - 1.0) * 100.0, "resolved": False,
         })
@@ -130,11 +159,11 @@ if __name__ == "__main__":
         f.loc[1, "signal"] = True
         return f
 
-    # First stop = max(90, 94) = 94; bar 3 dips to 93 -> CL at 94.
+    # First stop = max(90, 94.5) = 94.5; bar 3 dips to 93 -> CL at 94.5.
     f = frame()
     f.loc[3, "low"] = 93.0
     _, t, _ = run_state_machine(f)
-    assert (t[0]["exit_code"], t[0]["exit_price"]) == ("CL Stop loss", 94.0), t[0]
+    assert (t[0]["exit_code"], t[0]["exit_price"]) == ("CL Stop loss", 94.5), t[0]
     # Trailing: bar 3 reaches 108 -> stop 104.76; bar 4 dips to 104 -> TP at 104.76.
     f = frame()
     f.loc[3, "high"] = 108.0
@@ -142,12 +171,12 @@ if __name__ == "__main__":
     f.loc[4, "open"] = 106.0
     _, t, _ = run_state_machine(f)
     assert t[0]["exit_code"] == "TP Trailing stop" and round(t[0]["exit_price"], 2) == 104.76, t[0]
-    # TP: bar 3 reaches 116 -> sold at 115.
+    # TP: bar 3 reaches 121 -> sold at 120.
     f = frame()
-    f.loc[3, "high"] = 116.0
+    f.loc[3, "high"] = 121.0
     _, t, _ = run_state_machine(f)
-    assert t[0]["exit_code"] == "TP Target 15%" and round(t[0]["exit_price"], 6) == 115.0, t[0]
+    assert t[0]["exit_code"] == "TP Target 20%" and round(t[0]["exit_price"], 6) == 120.0, t[0]
     # Time stop: flat -> decided at bar 11 (10 after the signal), sold at bar 12's open.
     _, t, _ = run_state_machine(frame())
     assert t[0]["exit_code"] == "CL Time stop" and pd.Timestamp(t[0]["exit_date"]) == frame().loc[12, "date"], t[0]
-    print("ultimate_pro self-check ok")
+    print("sniper_vcp self-check ok")

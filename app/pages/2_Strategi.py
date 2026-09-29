@@ -3,7 +3,7 @@
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
 Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
 Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip, H = G with its IHSG and ADX
-filters, I = Ultimate Pro, J = Advanced Breakout v2) and the
+filters, I = Sniper VCP, J = Advanced Breakout v2) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -30,7 +30,7 @@ from idxcore.compute import advanced_breakout_v2 as adv2  # noqa: E402
 from idxcore.compute import buy_the_dip as btd  # noqa: E402
 from idxcore.compute import buy_the_dip_filtered as btdf  # noqa: E402
 from idxcore.compute import early_entry as ee  # noqa: E402
-from idxcore.compute import ultimate_pro as up  # noqa: E402
+from idxcore.compute import sniper_vcp as sv  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
 from idxcore.compute import pattern_breakout as pb  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
@@ -172,25 +172,33 @@ STRATEGIES = {
                "DI+ di atas DI-). Selebihnya, termasuk cara jual, sama dengan G. Ini "
                "pemantauan, bukan sinyal terbukti."),
     }),
-    "I": (up, "up", {
-        "en": ("Ultimate Pro. BUY as in F. First stop: the higher of the base low and "
-               "the signal close minus 6%. Once the high since the buy reaches +5%, "
-               "a trailing stop 3% under that high switches on (only rising). TP: "
-               "the whole position at +15%. Both work intraday from the day after the "
-               "buy; a day touching both counts as the stop. If the trailing never "
-               "switched on, it sells 10 days after the signal (time stop). As "
-               "written, the Pine never sells (its entry price is wiped on the "
-               "signal day), so this follows its comments, with the buy price taken "
-               "as the real fill. Monitoring, not a proven signal."),
-        "id": ("Ultimate Pro. BUY sama dengan F. Stop awal: yang lebih tinggi dari low "
-               "base dan close sinyal dikurangi 6%. Setelah high sejak beli mencapai "
-               "+5%, trailing stop 3% di bawah high itu aktif (hanya naik). TP: "
-               "seluruh posisi di +15%. Keduanya berlaku intraday mulai sehari setelah "
-               "beli; kalau satu hari menyentuh keduanya, dihitung kena stop. Kalau "
-               "trailing belum pernah aktif, dijual 10 hari setelah sinyal (time "
-               "stop). Pine aslinya tidak pernah menjual (harga belinya terhapus di "
-               "hari sinyal), jadi ini mengikuti maksud komentarnya, dengan harga beli "
-               "= harga isi sebenarnya. Ini pemantauan, bukan sinyal terbukti."),
+    "I": (sv, "sv", {
+        "en": ("Sniper VCP. Base: the last 40 days moved within a 12% range, in a "
+               "Minervini stage 2 uptrend (close over EMA50 over EMA150 over EMA200). "
+               "BUY on a close through the 20-day high on 2x the 50-day volume, "
+               "closing in the top 30% of its candle, filled at the NEXT day's open. "
+               "First stop: the higher of the base low and the signal close minus "
+               "5.5%. Once the high since the buy reaches +5%, a trailing stop 3% "
+               "under that high switches on (only rising). TP: the whole position at "
+               "+20%. Both work intraday from the day after the buy; a day touching "
+               "both counts as the stop. If the trailing never switched on, it sells "
+               "10 days after the signal (time stop). As written, the Pine never "
+               "sells (its entry price is wiped on the signal day), so this follows "
+               "its comments, with the buy price taken as the real fill. Monitoring, "
+               "not a proven signal."),
+        "id": ("Sniper VCP. Base: 40 hari terakhir bergerak dalam range maks 12%, dalam "
+               "uptrend stage 2 Minervini (close di atas EMA50 di atas EMA150 di atas "
+               "EMA200). BUY saat close menembus high 20 hari dengan volume 2x "
+               "rata-rata 50 hari dan close di 30% teratas candle; dibeli di OPEN "
+               "BESOKNYA. Stop awal: yang lebih tinggi dari low base dan close sinyal "
+               "dikurangi 5,5%. Setelah high sejak beli mencapai +5%, trailing stop 3% "
+               "di bawah high itu aktif (hanya naik). TP: seluruh posisi di +20%. "
+               "Keduanya berlaku intraday mulai sehari setelah beli; kalau satu hari "
+               "menyentuh keduanya, dihitung kena stop. Kalau trailing belum pernah "
+               "aktif, dijual 10 hari setelah sinyal (time stop). Pine aslinya tidak "
+               "pernah menjual (harga belinya terhapus di hari sinyal), jadi ini "
+               "mengikuti maksud komentarnya, dengan harga beli = harga isi "
+               "sebenarnya. Ini pemantauan, bukan sinyal terbukti."),
     }),
     "J": (adv2, "adv2", {
         "en": ("Advanced Breakout v2: E's BUY with extra protection. First stop: the "
