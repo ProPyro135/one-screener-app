@@ -45,13 +45,22 @@ PERIOD_LABELS = {
            "3y": "3 Thn", "5y": "5 Thn", "all": "Semua", "custom": "Custom"},
 }
 HI_DATE_LABEL = {"en": "Hi date", "id": "Tgl Hi"}
-MIN_PRICE_LABEL = {"en": "Min. price (Rp)", "id": "Harga min. (Rp)"}
-MIN_PRICE_HELP = {
-    "en": "Hides trades bought under this price; a watchlist row uses today's price.",
-    "id": "Sembunyikan trade dengan Harga BUY di bawah ini; baris watchlist memakai harga hari ini.",
+#: Range filters: an operator, then one or two bounds.
+RANGE_OPS = ["any", "ge", "le", "between"]
+RANGE_TEXT = {
+    "en": {"any": "All", "ge": "≥", "le": "≤", "between": "Between", "from": "From", "to": "To",
+           "price": "BUY price (Rp)", "turn": "Avg. daily value (Rp mn)",
+           "price_help": "The BUY price; a watchlist row uses today's price.",
+           "turn_help": "Average daily traded value over the last 60 days, in Rp million."},
+    "id": {"any": "Semua", "ge": "≥", "le": "≤", "between": "Antara", "from": "Dari", "to": "Sampai",
+           "price": "Harga BUY (Rp)", "turn": "Nilai transaksi/hari (Rp jt)",
+           "price_help": "Harga BUY; baris watchlist memakai harga hari ini.",
+           "turn_help": "Rata-rata nilai transaksi harian 60 hari terakhir, dalam juta rupiah."},
 }
-#: Owner's default: skip stocks priced under Rp60.
-MIN_PRICE = 60
+#: Owner's defaults: BUY price >= Rp60, and skip sleepy stocks (the old
+#: checkbox, now value >= Rp100 mn a day).
+PRICE_DEFAULT = ("ge", 60.0, 100.0)
+TURN_DEFAULT = ("ge", tl.SLEEPY_TURNOVER / 1e6, 1000.0)
 #: Earliest date the Custom calendar offers; the full store starts 2016-08-15.
 FIRST_DATE = date(2016, 1, 1)
 #: Owner's broker fees, of the transaction value: 0.15% to buy, 0.25% to sell.
@@ -70,8 +79,8 @@ TEXT = {
            "note": ("Measured on every trade in the selection, bought from {first} to "
                     "{last}. Win rate, TP, CL and gross P&L are before fees; net P&L "
                     "deducts 0.15% on the buy and 0.25% on the sell. P&L counts closed "
-                    "trades only (TP + CL). The sleepy-stock filter uses today's "
-                    "turnover, not the turnover at the time of the trade."),
+                    "trades only (TP + CL). The daily-value filter uses the last 60 "
+                    "days, not the value at the time of the trade."),
            "capped": "Showing the newest {shown:,} of {total:,} trades; the summary above counts all of them."},
     "id": {"view": "TAMPILAN", "now": "Posisi terkini", "bt": "Backtest",
            "trades": "Trade", "tp": "TP", "cl": "CL", "open": "Masih open",
@@ -82,8 +91,8 @@ TEXT = {
            "note": ("Diukur dari semua trade di pilihan ini, BUY dari {first} sampai "
                     "{last}. Win rate, TP, CL dan P&L bruto belum dipotong fee; P&L net "
                     "sudah dipotong fee beli 0,15% dan jual 0,25%. P&L hanya menghitung "
-                    "trade yang sudah selesai (TP + CL). Filter saham tidur memakai nilai "
-                    "transaksi hari ini, bukan saat trade terjadi."),
+                    "trade yang sudah selesai (TP + CL). Filter nilai transaksi memakai "
+                    "60 hari terakhir, bukan saat trade terjadi."),
            "capped": "Menampilkan {shown:,} trade terbaru dari {total:,}; ringkasan di atas menghitung semuanya."},
 }
 
@@ -93,7 +102,7 @@ def _filters(
     statuses: list[str], default_period: str = "all",
     default_status: tuple[str, ...] = (),
 ) -> pd.DataFrame:
-    """PERIOD, status and sleepy filters over whichever rows are passed in.
+    """PERIOD, status, price and daily-value filters over whichever rows are passed in.
 
     The widgets are keyed by view, not by strategy, and take the same options,
     bounds and defaults whatever strategy is showing. Streamlit then treats
@@ -121,21 +130,17 @@ def _filters(
     elif len(dates) and PERIODS.get(period) is not None:
         hi = dates.max()
         span = ((hi - PERIODS[period]).date(), hi.date())
-    col_status, col_price = st.columns([3, 1])
-    with col_status:
+    with st.columns(2)[0]:
         picked_status = st.multiselect(
             t("tl_f_status", lang), statuses, default=list(default_status),
             key=f"{key}_status",
         )
-    with col_price:
-        min_price = st.number_input(
-            MIN_PRICE_LABEL.get(lang, MIN_PRICE_LABEL["en"]), min_value=0, value=MIN_PRICE,
-            step=10, help=MIN_PRICE_HELP.get(lang, MIN_PRICE_HELP["en"]),
-            key=f"{key}_minprice",
-        )
-    skip_sleepy = st.checkbox(t("tl_f_sleepy", lang), value=True, key=f"{key}_sleepy")
+    rt = RANGE_TEXT.get(lang, RANGE_TEXT["en"])
+    keep_price = _range_filter(cur["buy_price"].fillna(cur["last_close"]), rt, "price",
+                               PRICE_DEFAULT, f"{key}_price")
+    keep_turn = _range_filter(cur["turnover"] / 1e6, rt, "turn", TURN_DEFAULT, f"{key}_turn")
 
-    r = cur
+    r = cur[keep_price & keep_turn]
     # A half-picked range is one date; leave the rows alone until both are set.
     if isinstance(span, (tuple, list)) and len(span) == 2:
         lo, hi = pd.Timestamp(span[0]), pd.Timestamp(span[1])
@@ -146,11 +151,32 @@ def _filters(
         r = r[bd.between(lo, hi) | bd.isna()]
     if picked_status:
         r = r[r["status"].isin(picked_status)]
-    if skip_sleepy:
-        r = r[~(r["turnover"] < tl.SLEEPY_TURNOVER)]
-    if min_price:
-        r = r[r["buy_price"].fillna(r["last_close"]) >= min_price]
     return r
+
+
+def _range_filter(values: pd.Series, rt: dict, name: str, default: tuple, key: str) -> pd.Series:
+    """One "operator + bounds" row; returns which rows to keep.
+
+    A row with no value (no turnover measured) is kept, as the old sleepy
+    checkbox did, rather than silently vanishing.
+    """
+    op0, lo0, hi0 = default
+    c = st.columns([2, 1, 1, 2])
+    op = c[0].selectbox(rt[name], RANGE_OPS, index=RANGE_OPS.index(op0),
+                        format_func=lambda o: rt[o], help=rt[f"{name}_help"], key=f"{key}_op")
+    lo = hi = None
+    if op in ("ge", "between"):
+        lo = c[1].number_input(rt["from"], min_value=0.0, value=lo0, key=f"{key}_lo")
+    if op in ("le", "between"):
+        hi = c[2 if op == "between" else 1].number_input(
+            rt["to"], min_value=0.0, value=hi0, key=f"{key}_hi")
+    known = values.notna()
+    keep = pd.Series(True, index=values.index)
+    if lo is not None:
+        keep &= ~known | (values >= lo)
+    if hi is not None:
+        keep &= ~known | (values <= hi)
+    return keep
 
 
 def _style(frame: pd.DataFrame, lang: str):

@@ -78,17 +78,12 @@ def prepare(history: pd.DataFrame) -> pd.DataFrame:
     vol_ok = vol >= vol.rolling(50, min_periods=50).mean() * VOL_MULT
     strong = close >= low + (high - low) * 0.6
     df["signal"] = cross & accum.shift(1, fill_value=False) & vol_ok & strong
-    df["range_low"] = range_low
+    df["range_low"] = range_low      # strategy I's first stop
     return df
 
 
-def run_state_machine(df: pd.DataFrame, base_low_stop: bool = False) -> tuple[list[str], list[dict], dict]:
-    """Signals at the close, fills at the next open, TP and stop resting.
-
-    ``base_low_stop`` (strategy I) keeps the base-low first stop the Pine sets
-    and then wipes; off, it runs as the Pine does (strategy F).
-    """
-    range_low = df["range_low"].to_numpy(float) if base_low_stop else None
+def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
+    """Signals at the close, fills at the next open, TP and stop resting."""
     dates = df["date"].to_numpy()
     o = pd.to_numeric(df["open"], errors="coerce").to_numpy(float)
     h = pd.to_numeric(df["high"], errors="coerce").to_numpy(float)
@@ -144,9 +139,6 @@ def run_state_machine(df: pd.DataFrame, base_low_stop: bool = False) -> tuple[li
             highest = stop = np.nan
             if signal[i]:
                 pending_buy = True
-                if base_low_stop:
-                    # What the Pine's comment intends: start at the base low.
-                    highest, stop = h[i], range_low[i]
         position_arr[i] = int(in_pos)
 
     if in_pos:

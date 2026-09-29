@@ -3,7 +3,7 @@
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
 Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
 Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip, H = G with its IHSG and ADX
-filters, I = F with its base-low stop) and the
+filters, I = Hard TP & BEP Stop) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -172,17 +172,21 @@ STRATEGIES = {
                "pemantauan, bukan sinyal terbukti."),
     }),
     "I": (eeb, "eeb", {
-        "en": ("Early Entry & Hard TP with its base-low stop: F as the Pine's comment "
-               "intends it. The first stop sits at the base low (the lowest low of "
-               "the 20 days before the signal), then trails the highest high since "
-               "the buy minus 3 ATR, only rising. In the Pine itself (and in F) "
-               "that first stop is wiped on the signal day. Everything else is F's. "
-               "Monitoring, not a proven signal."),
-        "id": ("Early Entry & Hard TP dengan stop di low base: F seperti yang "
-               "dimaksud komentar Pine-nya. Stop awal di low base (low terendah 20 "
-               "hari sebelum sinyal), lalu mengikuti high tertinggi sejak beli "
-               "dikurangi 3 ATR, hanya naik. Di Pine aslinya (dan di F) stop awal "
-               "itu terhapus di hari sinyal. Selebihnya sama dengan F. Ini "
+        "en": ("Hard TP & BEP Stop. BUY as in F. The stop starts at the base low (the "
+               "lowest low of the 20 days before the signal); once a day's high "
+               "reaches the buy price +5%, the stop moves up to the buy price (BEP). "
+               "TP: the whole position at +10%. Both work intraday from the day "
+               "after the buy; a day touching both counts as the stop. As written, "
+               "the Pine never sells (its entry price is wiped on the signal day), "
+               "so this follows its comments, with the buy price taken as the real "
+               "fill. Monitoring, not a proven signal."),
+        "id": ("Hard TP & BEP Stop. BUY sama dengan F. Stop awal di low base (low "
+               "terendah 20 hari sebelum sinyal); setelah high harian menyentuh harga "
+               "beli +5%, stop naik ke harga beli (BEP). TP: seluruh posisi di +10%. "
+               "Keduanya berlaku intraday mulai sehari setelah beli; kalau satu hari "
+               "menyentuh keduanya, dihitung kena stop. Pine aslinya tidak pernah "
+               "menjual (harga belinya terhapus di hari sinyal), jadi ini mengikuti "
+               "maksud komentarnya, dengan harga beli = harga isi sebenarnya. Ini "
                "pemantauan, bukan sinyal terbukti."),
     }),
 }
