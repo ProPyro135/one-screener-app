@@ -3,7 +3,7 @@
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
 Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
 Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip, H = G with its IHSG and ADX
-filters, I = Hard TP & BEP Stop) and the
+filters, I = Ultimate Pro, J = Advanced Breakout v2) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -26,10 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import trade_table  # noqa: E402
 from idxcore.compute import accumulation_breakout as ab  # noqa: E402
 from idxcore.compute import advanced_breakout as adv  # noqa: E402
+from idxcore.compute import advanced_breakout_v2 as adv2  # noqa: E402
 from idxcore.compute import buy_the_dip as btd  # noqa: E402
 from idxcore.compute import buy_the_dip_filtered as btdf  # noqa: E402
 from idxcore.compute import early_entry as ee  # noqa: E402
-from idxcore.compute import early_entry_base_stop as eeb  # noqa: E402
+from idxcore.compute import ultimate_pro as up  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
 from idxcore.compute import pattern_breakout as pb  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
@@ -171,23 +172,43 @@ STRATEGIES = {
                "DI+ di atas DI-). Selebihnya, termasuk cara jual, sama dengan G. Ini "
                "pemantauan, bukan sinyal terbukti."),
     }),
-    "I": (eeb, "eeb", {
-        "en": ("Hard TP & BEP Stop. BUY as in F. The stop starts at the base low (the "
-               "lowest low of the 20 days before the signal); once a day's high "
-               "reaches the buy price +5%, the stop moves up to the buy price (BEP). "
-               "TP: the whole position at +10%. Both work intraday from the day "
-               "after the buy; a day touching both counts as the stop. As written, "
-               "the Pine never sells (its entry price is wiped on the signal day), "
-               "so this follows its comments, with the buy price taken as the real "
-               "fill. Monitoring, not a proven signal."),
-        "id": ("Hard TP & BEP Stop. BUY sama dengan F. Stop awal di low base (low "
-               "terendah 20 hari sebelum sinyal); setelah high harian menyentuh harga "
-               "beli +5%, stop naik ke harga beli (BEP). TP: seluruh posisi di +10%. "
-               "Keduanya berlaku intraday mulai sehari setelah beli; kalau satu hari "
-               "menyentuh keduanya, dihitung kena stop. Pine aslinya tidak pernah "
-               "menjual (harga belinya terhapus di hari sinyal), jadi ini mengikuti "
-               "maksud komentarnya, dengan harga beli = harga isi sebenarnya. Ini "
-               "pemantauan, bukan sinyal terbukti."),
+    "I": (up, "up", {
+        "en": ("Ultimate Pro. BUY as in F. First stop: the higher of the base low and "
+               "the signal close minus 6%. Once the high since the buy reaches +5%, "
+               "a trailing stop 3% under that high switches on (only rising). TP: "
+               "the whole position at +15%. Both work intraday from the day after the "
+               "buy; a day touching both counts as the stop. If the trailing never "
+               "switched on, it sells 10 days after the signal (time stop). As "
+               "written, the Pine never sells (its entry price is wiped on the "
+               "signal day), so this follows its comments, with the buy price taken "
+               "as the real fill. Monitoring, not a proven signal."),
+        "id": ("Ultimate Pro. BUY sama dengan F. Stop awal: yang lebih tinggi dari low "
+               "base dan close sinyal dikurangi 6%. Setelah high sejak beli mencapai "
+               "+5%, trailing stop 3% di bawah high itu aktif (hanya naik). TP: "
+               "seluruh posisi di +15%. Keduanya berlaku intraday mulai sehari setelah "
+               "beli; kalau satu hari menyentuh keduanya, dihitung kena stop. Kalau "
+               "trailing belum pernah aktif, dijual 10 hari setelah sinyal (time "
+               "stop). Pine aslinya tidak pernah menjual (harga belinya terhapus di "
+               "hari sinyal), jadi ini mengikuti maksud komentarnya, dengan harga beli "
+               "= harga isi sebenarnya. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+    "J": (adv2, "adv2", {
+        "en": ("Advanced Breakout v2: E's BUY with extra protection. First stop: the "
+               "highest of close minus 4 ATR, the base low, and close minus 7%; then "
+               "a 4 ATR trailing stop. Once up 8%, the stop is at least the buy "
+               "price +1%. Within the first 10 days, a close more than 2% under the "
+               "breakout level is a failed breakout and sells. After 15 days without "
+               "ever reaching +5%, it sells (time stop). Every sale is at the next "
+               "open; above the buy price it counts as TP, otherwise as CL. "
+               "Monitoring, not a proven signal."),
+        "id": ("Advanced Breakout v2: BUY sama dengan E, dengan proteksi tambahan. Stop "
+               "awal: yang tertinggi dari close dikurangi 4 ATR, low base, dan close "
+               "dikurangi 7%; lalu trailing 4 ATR. Setelah naik 8%, stop minimal harga "
+               "beli +1%. Dalam 10 hari pertama, close lebih dari 2% di bawah level "
+               "breakout dianggap breakout gagal dan dijual. Setelah 15 hari tanpa "
+               "pernah naik 5%, dijual (time stop). Semua dijual di open besoknya; di "
+               "atas harga beli dihitung TP, selain itu CL. Ini pemantauan, bukan "
+               "sinyal terbukti."),
     }),
 }
 

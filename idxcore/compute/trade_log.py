@@ -8,8 +8,8 @@ entered within the last week.
 
 ``bottom_fishing``, ``market_structure``, ``reversal_sniper``,
 ``pattern_breakout``, ``accumulation_breakout``, ``advanced_breakout``,
-``early_entry``, ``early_entry_base_stop``, ``buy_the_dip`` and
-``buy_the_dip_filtered`` are the same shape — a state machine
+``advanced_breakout_v2``, ``early_entry``, ``ultimate_pro``,
+``buy_the_dip`` and ``buy_the_dip_filtered`` are the same shape — a state machine
 returning ``(codes, trades, lines)`` with identical trade records — so one
 builder serves them all. Pass the module itself as ``mod``.
 
@@ -237,15 +237,16 @@ def _check_next_open_fills() -> None:
 def _self_check(db_path: str) -> None:
     """Assert the log's invariants against a real store. See __main__ below."""
     _check_next_open_fills()
-    from idxcore.compute import (accumulation_breakout, advanced_breakout, bottom_fishing,
-                                 buy_the_dip, buy_the_dip_filtered, early_entry,
-                                 early_entry_base_stop, market_structure, pattern_breakout,
-                                 reversal_sniper)
+    from idxcore.compute import (accumulation_breakout, advanced_breakout,
+                                 advanced_breakout_v2, bottom_fishing, buy_the_dip,
+                                 buy_the_dip_filtered, early_entry,
+                                 market_structure, pattern_breakout, reversal_sniper,
+                                 ultimate_pro)
 
     con = duckdb.connect(db_path, read_only=True)
     for mod in (market_structure, reversal_sniper, pattern_breakout, accumulation_breakout,
                 advanced_breakout, early_entry, buy_the_dip, buy_the_dip_filtered,
-                early_entry_base_stop, bottom_fishing):
+                ultimate_pro, advanced_breakout_v2, bottom_fishing):
         log = build(con, mod)
         cur = latest(log)
         traded = log[log["status"] != WATCHLIST]
@@ -306,13 +307,15 @@ def publish(full_path: str, slim_path: str) -> int:
     names that failed. ``is_active`` travels with each row so the current-
     status view can still hide them.
     """
-    from idxcore.compute import (accumulation_breakout, advanced_breakout, buy_the_dip,
-                                 buy_the_dip_filtered, early_entry, early_entry_base_stop,
-                                 market_structure, pattern_breakout, reversal_sniper)
+    from idxcore.compute import (accumulation_breakout, advanced_breakout,
+                                 advanced_breakout_v2, buy_the_dip, buy_the_dip_filtered,
+                                 early_entry, market_structure,
+                                 pattern_breakout, reversal_sniper, ultimate_pro)
 
     strategies = {"A": market_structure, "B": reversal_sniper, "C": pattern_breakout,
                   "D": accumulation_breakout, "E": advanced_breakout, "F": early_entry,
-                  "G": buy_the_dip, "H": buy_the_dip_filtered, "I": early_entry_base_stop}
+                  "G": buy_the_dip, "H": buy_the_dip_filtered, "I": ultimate_pro,
+                  "J": advanced_breakout_v2}
     full = duckdb.connect(full_path, read_only=True)
     try:
         active = dict(full.execute("SELECT ticker, is_active FROM tickers").fetchall())
