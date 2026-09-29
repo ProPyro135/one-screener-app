@@ -45,6 +45,13 @@ PERIOD_LABELS = {
            "3y": "3 Thn", "5y": "5 Thn", "all": "Semua", "custom": "Custom"},
 }
 HI_DATE_LABEL = {"en": "Hi date", "id": "Tgl Hi"}
+MIN_PRICE_LABEL = {"en": "Min. price (Rp)", "id": "Harga min. (Rp)"}
+MIN_PRICE_HELP = {
+    "en": "Hides trades bought under this price; a watchlist row uses today's price.",
+    "id": "Sembunyikan trade dengan Harga BUY di bawah ini; baris watchlist memakai harga hari ini.",
+}
+#: Owner's default: skip stocks priced under Rp60.
+MIN_PRICE = 60
 #: Earliest date the Custom calendar offers; the full store starts 2016-08-15.
 FIRST_DATE = date(2016, 1, 1)
 #: Owner's broker fees, of the transaction value: 0.15% to buy, 0.25% to sell.
@@ -114,10 +121,17 @@ def _filters(
     elif len(dates) and PERIODS.get(period) is not None:
         hi = dates.max()
         span = ((hi - PERIODS[period]).date(), hi.date())
-    with st.columns(2)[0]:
+    col_status, col_price = st.columns([3, 1])
+    with col_status:
         picked_status = st.multiselect(
             t("tl_f_status", lang), statuses, default=list(default_status),
             key=f"{key}_status",
+        )
+    with col_price:
+        min_price = st.number_input(
+            MIN_PRICE_LABEL.get(lang, MIN_PRICE_LABEL["en"]), min_value=0, value=MIN_PRICE,
+            step=10, help=MIN_PRICE_HELP.get(lang, MIN_PRICE_HELP["en"]),
+            key=f"{key}_minprice",
         )
     skip_sleepy = st.checkbox(t("tl_f_sleepy", lang), value=True, key=f"{key}_sleepy")
 
@@ -134,6 +148,8 @@ def _filters(
         r = r[r["status"].isin(picked_status)]
     if skip_sleepy:
         r = r[~(r["turnover"] < tl.SLEEPY_TURNOVER)]
+    if min_price:
+        r = r[r["buy_price"].fillna(r["last_close"]) >= min_price]
     return r
 
 
