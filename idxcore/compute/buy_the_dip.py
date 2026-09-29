@@ -78,6 +78,8 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
     atr = df["atr"].to_numpy(float)
     uptrend, golden = df["uptrend"].to_numpy(bool), df["golden"].to_numpy(bool)
     death, dip = df["death"].to_numpy(bool), df["dip"].to_numpy(bool)
+    # Optional extra gate on entries (buy_the_dip_filtered sets it).
+    entry_ok = df["entry_ok"].to_numpy(bool) if "entry_ok" in df else np.ones(len(df), bool)
 
     n = len(df)
     codes = [""] * n
@@ -116,7 +118,7 @@ def run_state_machine(df: pd.DataFrame) -> tuple[list[str], list[dict], dict]:
         exit_now = exit_trail or exit_trend
         if exit_now:
             pending_exit = "MA cross down" if exit_trend else "Trailing stop"
-        buy = (uptrend[i] and len(held) < MAX_ENTRIES and i - last_entry >= MIN_GAP
+        buy = (uptrend[i] and entry_ok[i] and len(held) < MAX_ENTRIES and i - last_entry >= MIN_GAP
                and not exit_now and (golden[i] or dip[i]))
         if buy:
             pending_buy = "BUY Golden cross" if golden[i] else "BUY Dip"

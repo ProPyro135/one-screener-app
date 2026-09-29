@@ -2,7 +2,8 @@
 
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
 Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
-Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip) and the
+Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip, H = G with its IHSG and ADX
+filters) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -26,6 +27,7 @@ import trade_table  # noqa: E402
 from idxcore.compute import accumulation_breakout as ab  # noqa: E402
 from idxcore.compute import advanced_breakout as adv  # noqa: E402
 from idxcore.compute import buy_the_dip as btd  # noqa: E402
+from idxcore.compute import buy_the_dip_filtered as btdf  # noqa: E402
 from idxcore.compute import early_entry as ee  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
 from idxcore.compute import pattern_breakout as pb  # noqa: E402
@@ -155,6 +157,18 @@ STRATEGIES = {
                "stop (close dikurangi 3 ATR, hanya naik) atau MA20 memotong ke bawah "
                "MA50. Baris yang terjual di atas harga belinya dihitung TP, selain "
                "itu CL. Ini pemantauan, bukan sinyal terbukti."),
+    }),
+    "H": (btdf, "btdf", {
+        "en": ("Uptrend Buy The Dip v2: G with two of its filters on. A BUY is only "
+               "taken while IHSG is rising (IHSG MA20 over MA50 and IHSG above its "
+               "MA200) and the stock's own trend is strong (ADX over 20 with DI+ "
+               "over DI-). Everything else, the exits included, is as in G. "
+               "Monitoring, not a proven signal."),
+        "id": ("Uptrend Buy The Dip v2: G dengan dua filternya aktif. BUY hanya "
+               "diambil saat IHSG sedang naik (MA20 IHSG di atas MA50 dan IHSG di "
+               "atas MA200) dan tren sahamnya sendiri kuat (ADX di atas 20 dengan "
+               "DI+ di atas DI-). Selebihnya, termasuk cara jual, sama dengan G. Ini "
+               "pemantauan, bukan sinyal terbukti."),
     }),
 }
 
