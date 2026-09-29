@@ -3,7 +3,7 @@
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
 Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
 Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip, H = G with its IHSG and ADX
-filters) and the
+filters, I = F with its base-low stop) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -29,6 +29,7 @@ from idxcore.compute import advanced_breakout as adv  # noqa: E402
 from idxcore.compute import buy_the_dip as btd  # noqa: E402
 from idxcore.compute import buy_the_dip_filtered as btdf  # noqa: E402
 from idxcore.compute import early_entry as ee  # noqa: E402
+from idxcore.compute import early_entry_base_stop as eeb  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
 from idxcore.compute import pattern_breakout as pb  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
@@ -168,6 +169,20 @@ STRATEGIES = {
                "diambil saat IHSG sedang naik (MA20 IHSG di atas MA50 dan IHSG di "
                "atas MA200) dan tren sahamnya sendiri kuat (ADX di atas 20 dengan "
                "DI+ di atas DI-). Selebihnya, termasuk cara jual, sama dengan G. Ini "
+               "pemantauan, bukan sinyal terbukti."),
+    }),
+    "I": (eeb, "eeb", {
+        "en": ("Early Entry & Hard TP with its base-low stop: F as the Pine's comment "
+               "intends it. The first stop sits at the base low (the lowest low of "
+               "the 20 days before the signal), then trails the highest high since "
+               "the buy minus 3 ATR, only rising. In the Pine itself (and in F) "
+               "that first stop is wiped on the signal day. Everything else is F's. "
+               "Monitoring, not a proven signal."),
+        "id": ("Early Entry & Hard TP dengan stop di low base: F seperti yang "
+               "dimaksud komentar Pine-nya. Stop awal di low base (low terendah 20 "
+               "hari sebelum sinyal), lalu mengikuti high tertinggi sejak beli "
+               "dikurangi 3 ATR, hanya naik. Di Pine aslinya (dan di F) stop awal "
+               "itu terhapus di hari sinyal. Selebihnya sama dengan F. Ini "
                "pemantauan, bukan sinyal terbukti."),
     }),
 }
