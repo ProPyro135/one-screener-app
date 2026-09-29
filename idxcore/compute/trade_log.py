@@ -49,28 +49,27 @@ SLEEPY_TURNOVER = 100_000_000.0
 COLUMNS = [
     "ticker", "idx_code", "name", "status", "buy_date", "pb", "buy_price",
     "last_close", "fl_pct", "hi_price", "hi_date", "max_fl_pct", "exit_date", "exit_price",
-    "pl_pct", "entry_code", "exit_code", "turnover", "mcap",
+    "pl_pct", "entry_code", "exit_code", "turnover", "avg_lots", "mcap",
 ]
 
 
-def turnover(con: duckdb.DuckDBPyConnection, bars: int = TURNOVER_BARS) -> pd.Series:
-    """Average daily close x volume per ticker over the last ``bars`` bars.
-
-    The store has no market cap or share count, so this is the only size /
-    liquidity measure available to it.
-    """
+def liquidity(con: duckdb.DuckDBPyConnection, bars: int = TURNOVER_BARS) -> pd.DataFrame:
+    """Per ticker over the last ``bars`` bars: average daily value traded
+    (close x volume, ``turnover``) and average daily volume in lots of 100
+    shares (``lots``)."""
     frame = con.execute(
         """
         WITH r AS (
-            SELECT ticker, close * volume AS v,
+            SELECT ticker, close * volume AS v, volume,
                    row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
             FROM prices
         )
-        SELECT ticker, avg(v) AS turnover FROM r WHERE rn <= ? GROUP BY 1
+        SELECT ticker, avg(v) AS turnover, avg(volume) / 100 AS lots
+          FROM r WHERE rn <= ? GROUP BY 1
         """,
         [bars],
     ).df()
-    return frame.set_index("ticker")["turnover"]
+    return frame.set_index("ticker")
 
 
 def listed_shares(con: duckdb.DuckDBPyConnection) -> pd.Series:
@@ -172,7 +171,8 @@ def build(
     """
     bars = mod._all_bars(con, tickers)
     meta = mod._ticker_meta(con)
-    turn = turnover(con)
+    liq = liquidity(con)
+    turn, lots = liq["turnover"], liq["lots"]
     shares = listed_shares(con)
     rows: list[dict] = []
 
@@ -189,6 +189,7 @@ def build(
             "ticker": ticker, "idx_code": idx_code, "name": name,
             "last_close": float(g["close"].iloc[-1]),
             "turnover": float(turn.get(ticker, float("nan"))),
+            "avg_lots": float(lots.get(ticker, float("nan"))),
             # Today's market cap: latest listed shares x last close.
             "mcap": float(shares.get(ticker, float("nan"))) * float(g["close"].iloc[-1]),
         }
