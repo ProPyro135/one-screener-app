@@ -47,6 +47,8 @@ PERIOD_LABELS = {
 HI_DATE_LABEL = {"en": "Hi date", "id": "Tgl Hi"}
 #: The close the BUY was decided at; the BUY itself fills at the next open.
 SIGNAL_DATE_LABEL = {"en": "Signal date", "id": "Tgl sinyal"}
+#: The close on the signal date. Every P&L is still measured from the BUY price.
+SIGNAL_PRICE_LABEL = {"en": "Signal price", "id": "Hrg sinyal"}
 DATE_COLS = {"buy": "buy_date", "signal": "signal_date", "exit": "exit_date"}
 DATE_BASIS = {
     "en": {"title": "PERIOD by", "buy": "BUY date", "signal": "Signal date", "exit": "Sale date (TP/CL)"},
@@ -219,7 +221,10 @@ def _style(frame: pd.DataFrame, lang: str):
         t("c_name", lang): frame["name"],
         t("tl_status", lang): frame["status"],
         SIGNAL_DATE_LABEL.get(lang, SIGNAL_DATE_LABEL["en"]): pd.to_datetime(_col(frame, "signal_date")),
+        SIGNAL_PRICE_LABEL.get(lang, SIGNAL_PRICE_LABEL["en"]): _col(frame, "signal_price"),
         t("tl_buy_date", lang): pd.to_datetime(frame["buy_date"]),
+        # The sale date next to the BUY date, so a trade's three dates read in a row.
+        t("tl_exit_date", lang): pd.to_datetime(frame["exit_date"]),
         t("tl_pb", lang): frame["pb"],
         t("tl_buy_price", lang): frame["buy_price"],
         t("tl_last", lang): frame["last_close"],
@@ -230,14 +235,14 @@ def _style(frame: pd.DataFrame, lang: str):
         # Absent from a trade log published before the column existed.
         HI_DATE_LABEL.get(lang, "Hi date"): pd.to_datetime(frame.get("hi_date")),
         t("tl_max_fl", lang): frame["max_fl_pct"],
-        t("tl_exit_date", lang): pd.to_datetime(frame["exit_date"]),
         t("tl_exit_price", lang): frame["exit_price"],
         t("tl_pl", lang): frame["pl_pct"],
         t("tl_entry_code", lang): frame["entry_code"],
         t("tl_exit_code", lang): frame["exit_code"],
     })
     pct_cols = [t("tl_fl", lang), t("tl_max_fl", lang), t("tl_pl", lang)]
-    price_cols = [t("tl_buy_price", lang), t("tl_last", lang),
+    price_cols = [SIGNAL_PRICE_LABEL.get(lang, SIGNAL_PRICE_LABEL["en"]),
+                  t("tl_buy_price", lang), t("tl_last", lang),
                   t("tl_hi", lang), t("tl_exit_price", lang), MCAP_COL.get(lang, MCAP_COL["en"]),
                   LOTS_COL.get(lang, LOTS_COL["en"])]
 

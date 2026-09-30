@@ -47,7 +47,8 @@ TURNOVER_BARS = 60
 SLEEPY_TURNOVER = 100_000_000.0
 
 COLUMNS = [
-    "ticker", "idx_code", "name", "status", "signal_date", "buy_date", "pb", "buy_price",
+    "ticker", "idx_code", "name", "status", "signal_date", "signal_price", "buy_date", "pb",
+    "buy_price",
     "last_close", "fl_pct", "hi_price", "hi_date", "max_fl_pct", "exit_date", "exit_price",
     "pl_pct", "entry_code", "exit_code", "turnover", "avg_lots", "mcap",
 ]
@@ -104,15 +105,18 @@ def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
     ret = float(t["gross_return_pct"])
     # Every strategy on the page decides at a close and buys at the next open,
     # so the signal came on the bar before the BUY date.
-    before = g.loc[g["date"] < t["entry_date"], "date"]
-    signal_date = before.iloc[-1] if len(before) else pd.NaT
+    before = g.loc[g["date"] < t["entry_date"]]
+    signal_date = before["date"].iloc[-1] if len(before) else pd.NaT
+    # The close the BUY was decided at; the trade itself is priced off the BUY.
+    signal_price = float(before["close"].iloc[-1]) if len(before) else float("nan")
 
     row = dict(base)
     row.update(
         status=OPEN if running else
         (EXIT if mod.category_of(t["exit_code"]) == "CUT LOSS" else CLOSED),
         pb="B",
-        signal_date=signal_date, buy_date=t["entry_date"], buy_price=entry,
+        signal_date=signal_date, signal_price=signal_price,
+        buy_date=t["entry_date"], buy_price=entry,
         entry_code=t["entry_code"],
         hi_price=hi, hi_date=hi_date, max_fl_pct=(hi / entry - 1.0) * 100.0,
     )
@@ -206,7 +210,14 @@ def build(
         armed = lines.get("pantau") or lines.get("setup")
         holding = any(not t["resolved"] for t in trades)
         if not holding and (pending_buy or (lines["position"][-1] == 0 and armed and armed[-1])):
-            rows.append({**base, "status": WATCHLIST, "pb": "P"})
+            row = {**base, "status": WATCHLIST, "pb": "P"}
+            # A BUY signalled at today's close: the signal is today, the BUY
+            # fills tomorrow (H+1). Market Structure and Reversal Sniper also
+            # arm setups that have not signalled yet; those carry no signal.
+            # The other strategies only arm on a signal.
+            if pending_buy or not getattr(mod, "FILL_NEXT_OPEN", False):
+                row.update(signal_date=g["date"].iloc[-1], signal_price=float(g["close"].iloc[-1]))
+            rows.append(row)
 
     return pd.DataFrame(rows, columns=COLUMNS)
 
@@ -284,6 +295,10 @@ def _self_check(db_path: str) -> None:
         # The signal is the close before the BUY's fill.
         signalled = traded[traded["signal_date"].notna()]
         assert (signalled["signal_date"] < signalled["buy_date"]).all()
+        assert signalled["signal_price"].notna().all()
+        # A watchlist row with a signal is today's signal, not bought yet.
+        watch = log[(log["status"] == WATCHLIST) & log["signal_date"].notna()]
+        assert watch["buy_date"].isna().all() and watch["signal_price"].notna().all()
         # EXIT is the cut-loss bucket by construction. Not necessarily a loss:
         # Bottom Fishing's stops trigger on the bar's low but fill at its close,
         # so a bar that dips through the stop and recovers exits in profit.
