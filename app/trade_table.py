@@ -45,6 +45,8 @@ PERIOD_LABELS = {
            "3y": "3 Thn", "5y": "5 Thn", "all": "Semua", "custom": "Custom"},
 }
 HI_DATE_LABEL = {"en": "Hi date", "id": "Tgl Hi"}
+#: The close the BUY was decided at; the BUY itself fills at the next open.
+SIGNAL_DATE_LABEL = {"en": "Signal date", "id": "Tgl sinyal"}
 #: Range filters: an operator, then one or two bounds.
 RANGE_OPS = ["any", "ge", "le", "between"]
 RANGE_TEXT = {
@@ -205,6 +207,7 @@ def _style(frame: pd.DataFrame, lang: str):
         t("c_ticker", lang): frame["idx_code"].fillna(frame["ticker"]),
         t("c_name", lang): frame["name"],
         t("tl_status", lang): frame["status"],
+        SIGNAL_DATE_LABEL.get(lang, SIGNAL_DATE_LABEL["en"]): pd.to_datetime(_col(frame, "signal_date")),
         t("tl_buy_date", lang): pd.to_datetime(frame["buy_date"]),
         t("tl_pb", lang): frame["pb"],
         t("tl_buy_price", lang): frame["buy_price"],
@@ -245,6 +248,7 @@ def _style(frame: pd.DataFrame, lang: str):
     fmt = {c: "{:,.0f}" for c in price_cols}
     fmt.update({c: "{:+.2f}%" for c in pct_cols})
     fmt[t("tl_buy_date", lang)] = "{:%d/%m/%Y}"
+    fmt[SIGNAL_DATE_LABEL.get(lang, SIGNAL_DATE_LABEL["en"])] = "{:%d/%m/%Y}"
     fmt[HI_DATE_LABEL.get(lang, "Hi date")] = "{:%d/%m/%Y}"
     fmt[t("tl_exit_date", lang)] = "{:%d/%m/%Y}"
     return (out.style

@@ -47,7 +47,7 @@ TURNOVER_BARS = 60
 SLEEPY_TURNOVER = 100_000_000.0
 
 COLUMNS = [
-    "ticker", "idx_code", "name", "status", "buy_date", "pb", "buy_price",
+    "ticker", "idx_code", "name", "status", "signal_date", "buy_date", "pb", "buy_price",
     "last_close", "fl_pct", "hi_price", "hi_date", "max_fl_pct", "exit_date", "exit_price",
     "pl_pct", "entry_code", "exit_code", "turnover", "avg_lots", "mcap",
 ]
@@ -102,13 +102,18 @@ def _trade_row(base: dict, t: dict, mod, g: pd.DataFrame) -> dict:
     # The day Max % FL was reached: the first bar that printed that high.
     hi_date = g.at[highs.idxmax(), "date"] if highs.notna().any() else pd.NaT
     ret = float(t["gross_return_pct"])
+    # Every strategy on the page decides at a close and buys at the next open,
+    # so the signal came on the bar before the BUY date.
+    before = g.loc[g["date"] < t["entry_date"], "date"]
+    signal_date = before.iloc[-1] if len(before) else pd.NaT
 
     row = dict(base)
     row.update(
         status=OPEN if running else
         (EXIT if mod.category_of(t["exit_code"]) == "CUT LOSS" else CLOSED),
         pb="B",
-        buy_date=t["entry_date"], buy_price=entry, entry_code=t["entry_code"],
+        signal_date=signal_date, buy_date=t["entry_date"], buy_price=entry,
+        entry_code=t["entry_code"],
         hi_price=hi, hi_date=hi_date, max_fl_pct=(hi / entry - 1.0) * 100.0,
     )
     # The same number means different things either side of the exit, so it is
@@ -276,6 +281,9 @@ def _self_check(db_path: str) -> None:
         end = peaked["exit_date"].fillna(pd.Timestamp.max)
         assert ((peaked["hi_date"] > peaked["buy_date"]) & (peaked["hi_date"] <= end)).all()
         assert (no_peak["status"].eq(OPEN) | no_peak["exit_date"].eq(no_peak["buy_date"])).all()
+        # The signal is the close before the BUY's fill.
+        signalled = traded[traded["signal_date"].notna()]
+        assert (signalled["signal_date"] < signalled["buy_date"]).all()
         # EXIT is the cut-loss bucket by construction. Not necessarily a loss:
         # Bottom Fishing's stops trigger on the bar's low but fill at its close,
         # so a bar that dips through the stop and recovers exits in profit.
