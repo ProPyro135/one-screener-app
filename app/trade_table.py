@@ -47,6 +47,11 @@ PERIOD_LABELS = {
 HI_DATE_LABEL = {"en": "Hi date", "id": "Tgl Hi"}
 #: The close the BUY was decided at; the BUY itself fills at the next open.
 SIGNAL_DATE_LABEL = {"en": "Signal date", "id": "Tgl sinyal"}
+DATE_COLS = {"buy": "buy_date", "signal": "signal_date", "exit": "exit_date"}
+DATE_BASIS = {
+    "en": {"title": "PERIOD by", "buy": "BUY date", "signal": "Signal date", "exit": "Sale date (TP/CL)"},
+    "id": {"title": "PERIOD berdasarkan", "buy": "Tgl BUY", "signal": "Tgl sinyal", "exit": "Tgl jual (TP/CL)"},
+}
 #: Range filters: an operator, then one or two bounds.
 RANGE_OPS = ["any", "ge", "le", "between"]
 RANGE_TEXT = {
@@ -125,7 +130,12 @@ def _filters(
     picked; anything strategy-specific here (a status list, a calendar bound)
     would make it a new widget and reset the filter.
     """
-    dates = pd.to_datetime(cur["buy_date"]).dropna()
+    # Which date the PERIOD applies to: the BUY (default), the signal or the sale.
+    dt_text = DATE_BASIS.get(lang, DATE_BASIS["en"])
+    basis = st.radio(dt_text["title"], list(DATE_COLS), horizontal=True,
+                     format_func=lambda b: dt_text[b], key=f"{key}_datebasis")
+    col = DATE_COLS[basis]
+    dates = pd.to_datetime(_col(cur, col)).dropna()
     # One click for the usual windows; the range calendar only for Custom. Its
     # own row, so all the buttons fit on one line.
     period = st.segmented_control(
@@ -161,11 +171,12 @@ def _filters(
     # A half-picked range is one date; leave the rows alone until both are set.
     if isinstance(span, (tuple, list)) and len(span) == 2:
         lo, hi = pd.Timestamp(span[0]), pd.Timestamp(span[1])
-        bd = pd.to_datetime(r["buy_date"])
-        # Watchlist rows have no BUY date at all. Dropping them here would mean
-        # the date filter silently hides every armed setup, which is the
-        # opposite of useful — exclude them with the status filter instead.
-        r = r[bd.between(lo, hi) | bd.isna()]
+        bd = pd.to_datetime(_col(r, col))
+        # Watchlist rows have no BUY or signal date at all. Dropping them here
+        # would mean the date filter silently hides every armed setup, which
+        # is the opposite of useful — exclude them with the status filter
+        # instead. By sale date, a trade not sold yet is simply out of range.
+        r = r[bd.between(lo, hi) | (bd.isna() & (col != "exit_date"))]
     if picked_status:
         r = r[r["status"].isin(picked_status)]
     return r
@@ -290,6 +301,10 @@ def _backtest(log: pd.DataFrame, lang: str, key: str) -> None:
     # averages beside it show how a low win rate can still average a profit.
     tp_pl = done.loc[done["status"] == tl.CLOSED, "pl_pct"]
     cl_pl = done.loc[done["status"] == tl.EXIT, "pl_pct"]
+    # Streamlit's metric numbers are headline-sized; eight of them in two rows
+    # read better smaller.
+    st.markdown("<style>[data-testid='stMetricValue']{font-size:1.4rem}</style>",
+                unsafe_allow_html=True)
     c = st.columns(4)
     c[0].metric(tx["trades"], f"{len(r):,}")
     c[1].metric(tx["tp"], f"{len(tp_pl):,}")
