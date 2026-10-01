@@ -8,7 +8,7 @@ entered within the last week.
 
 ``bottom_fishing``, ``market_structure``, ``reversal_sniper``,
 ``pattern_breakout``, ``accumulation_breakout``, ``advanced_breakout``,
-``advanced_breakout_v2``, ``early_entry``, ``sniper_vcp``,
+``advanced_breakout_v2``, ``early_entry``, ``sniper_vcp``, ``sniper_vcp_tpsl``,
 ``buy_the_dip`` and ``buy_the_dip_filtered`` are the same shape — a state machine
 returning ``(codes, trades, lines)`` with identical trade records — so one
 builder serves them all. Pass the module itself as ``mod``.
@@ -258,12 +258,12 @@ def _self_check(db_path: str) -> None:
                                  advanced_breakout_v2, bottom_fishing, buy_the_dip,
                                  buy_the_dip_filtered, early_entry,
                                  market_structure, pattern_breakout, reversal_sniper,
-                                 sniper_vcp)
+                                 sniper_vcp, sniper_vcp_tpsl)
 
     con = duckdb.connect(db_path, read_only=True)
     for mod in (market_structure, reversal_sniper, pattern_breakout, accumulation_breakout,
                 advanced_breakout, early_entry, buy_the_dip, buy_the_dip_filtered,
-                sniper_vcp, advanced_breakout_v2, bottom_fishing):
+                sniper_vcp, advanced_breakout_v2, sniper_vcp_tpsl, bottom_fishing):
         log = build(con, mod)
         cur = latest(log)
         traded = log[log["status"] != WATCHLIST]
@@ -334,12 +334,13 @@ def publish(full_path: str, slim_path: str) -> int:
     from idxcore.compute import (accumulation_breakout, advanced_breakout,
                                  advanced_breakout_v2, buy_the_dip, buy_the_dip_filtered,
                                  early_entry, market_structure,
-                                 pattern_breakout, reversal_sniper, sniper_vcp)
+                                 pattern_breakout, reversal_sniper, sniper_vcp,
+                                 sniper_vcp_tpsl)
 
     strategies = {"A": market_structure, "B": reversal_sniper, "C": pattern_breakout,
                   "D": accumulation_breakout, "E": advanced_breakout, "F": early_entry,
                   "G": buy_the_dip, "H": buy_the_dip_filtered, "I": sniper_vcp,
-                  "J": advanced_breakout_v2}
+                  "J": advanced_breakout_v2, "K": sniper_vcp_tpsl}
     full = duckdb.connect(full_path, read_only=True)
     try:
         active = dict(full.execute("SELECT ticker, is_active FROM tickers").fetchall())

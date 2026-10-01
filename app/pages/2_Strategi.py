@@ -3,7 +3,8 @@
 Pick a strategy (PINESCRIPT A = Market Structure, B = Reversal Sniper, C =
 Pattern Breakout VCP & Double Bottom, D = Accumulation Breakout, E = Advanced
 Breakout, F = Early Entry & Hard TP, G = Uptrend Buy The Dip, H = G with its IHSG and ADX
-filters, I = Sniper VCP, J = Advanced Breakout v2) and the
+filters, I = Sniper VCP, J = Advanced Breakout v2, K = Sniper VCP
+with a fixed TP/SL) and the
 same trade table shows every stock's latest trade under it: OPEN, WATCHLIST,
 CLOSED or EXIT. Read-only over the store, so it runs unchanged on the full
 local store and the slim hosted one.
@@ -31,6 +32,7 @@ from idxcore.compute import buy_the_dip as btd  # noqa: E402
 from idxcore.compute import buy_the_dip_filtered as btdf  # noqa: E402
 from idxcore.compute import early_entry as ee  # noqa: E402
 from idxcore.compute import sniper_vcp as sv  # noqa: E402
+from idxcore.compute import sniper_vcp_tpsl as svk  # noqa: E402
 from idxcore.compute import market_structure as ms  # noqa: E402
 from idxcore.compute import pattern_breakout as pb  # noqa: E402
 from idxcore.compute import reversal_sniper as rs  # noqa: E402
@@ -217,6 +219,21 @@ STRATEGIES = {
                "pernah naik 5%, dijual (time stop). Semua dijual di open besoknya; di "
                "atas harga beli dihitung TP, selain itu CL. Ini pemantauan, bukan "
                "sinyal terbukti."),
+    }),
+    "K": (svk, "svk", {
+        "en": ("Sniper VCP + fixed TP/SL (hypothesis). BUY exactly as I (Sniper VCP), "
+               "filled at the NEXT day's open. TP: the whole position at +7% over the "
+               "buy price; SL: -10%. Both work intraday from the day after the buy; a "
+               "day touching both counts as the SL. This exit had the best win rate "
+               "that stayed profitable: chosen on 2016-2022, then checked on "
+               "2023-2026. Signals are rare. Monitoring, not a proven signal."),
+        "id": ("Sniper VCP + TP/SL tetap (hipotesis). BUY sama persis dengan I (Sniper "
+               "VCP), dibeli di OPEN BESOKNYA. TP: seluruh posisi di +7% dari harga "
+               "beli; SL: -10%. Keduanya berlaku intraday mulai sehari setelah beli; "
+               "kalau satu hari menyentuh keduanya, dihitung kena SL. Exit ini memberi "
+               "win rate terbaik yang tetap untung: dipilih dari data 2016-2022, lalu "
+               "dicek di 2023-2026. Sinyalnya jarang. Ini pemantauan, bukan sinyal "
+               "terbukti."),
     }),
 }
 
