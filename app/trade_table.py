@@ -214,6 +214,7 @@ def _style(frame: pd.DataFrame, lang: str):
         t("tl_buy_date", lang): pd.to_datetime(frame["buy_date"]),
         # The sale date next to the BUY date, so a trade's three dates read in a row.
         t("tl_exit_date", lang): pd.to_datetime(frame["exit_date"]),
+        t("tl_exit_price", lang): frame["exit_price"],
         t("tl_pb", lang): frame["pb"],
         t("tl_buy_price", lang): frame["buy_price"],
         t("tl_last", lang): frame["last_close"],
@@ -224,7 +225,6 @@ def _style(frame: pd.DataFrame, lang: str):
         # Absent from a trade log published before the column existed.
         HI_DATE_LABEL.get(lang, "Hi date"): pd.to_datetime(frame.get("hi_date")),
         t("tl_max_fl", lang): frame["max_fl_pct"],
-        t("tl_exit_price", lang): frame["exit_price"],
         t("tl_pl", lang): frame["pl_pct"],
         t("tl_entry_code", lang): frame["entry_code"],
         t("tl_exit_code", lang): frame["exit_code"],
