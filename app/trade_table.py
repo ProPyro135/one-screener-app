@@ -37,7 +37,7 @@ PERIODS = {
 #: Labels kept here, not in idxcore/i18n.py: a Streamlit hot reload re-imports
 #: this file but keeps the old i18n module, so new i18n keys raise KeyError
 #: until someone reboots the app.
-PERIOD_TITLE = "PERIOD"
+PERIOD_TITLE = "PERIOD (Tgl sinyal)"
 PERIOD_LABELS = {
     "en": {"1w": "1W", "1m": "1M", "3m": "3M", "6m": "6M", "1y": "1Y", "3y": "3Y",
            "5y": "5Y", "all": "All", "custom": "Custom"},
@@ -127,7 +127,9 @@ def _filters(
     picked; anything strategy-specific here (a status list, a calendar bound)
     would make it a new widget and reset the filter.
     """
-    dates = pd.to_datetime(cur["buy_date"]).dropna()
+    # PERIOD picks trades by their signal date: pick today to see today's
+    # signals, to be bought at tomorrow's open.
+    dates = pd.to_datetime(_col(cur, "signal_date")).dropna()
     # One click for the usual windows; the range calendar only for Custom. Its
     # own row, so all the buttons fit on one line.
     period = st.segmented_control(
@@ -163,11 +165,11 @@ def _filters(
     # A half-picked range is one date; leave the rows alone until both are set.
     if isinstance(span, (tuple, list)) and len(span) == 2:
         lo, hi = pd.Timestamp(span[0]), pd.Timestamp(span[1])
-        bd = pd.to_datetime(r["buy_date"])
-        # Watchlist rows have no BUY date at all. Dropping them here would mean
-        # the date filter silently hides every armed setup, which is the
-        # opposite of useful — exclude them with the status filter instead.
-        r = r[bd.between(lo, hi) | bd.isna()]
+        sd = pd.to_datetime(_col(r, "signal_date"))
+        # A setup armed without a signal yet (Market Structure, Reversal
+        # Sniper) has no signal date. Dropping it here would mean the date
+        # filter silently hides it — exclude it with the status filter instead.
+        r = r[sd.between(lo, hi) | sd.isna()]
     if picked_status:
         r = r[r["status"].isin(picked_status)]
     return r
@@ -212,9 +214,6 @@ def _style(frame: pd.DataFrame, lang: str):
         SIGNAL_DATE_LABEL.get(lang, SIGNAL_DATE_LABEL["en"]): pd.to_datetime(_col(frame, "signal_date")),
         SIGNAL_PRICE_LABEL.get(lang, SIGNAL_PRICE_LABEL["en"]): _col(frame, "signal_price"),
         t("tl_buy_date", lang): pd.to_datetime(frame["buy_date"]),
-        # The sale date next to the BUY date, so a trade's three dates read in a row.
-        t("tl_exit_date", lang): pd.to_datetime(frame["exit_date"]),
-        t("tl_exit_price", lang): frame["exit_price"],
         t("tl_pb", lang): frame["pb"],
         t("tl_buy_price", lang): frame["buy_price"],
         t("tl_last", lang): frame["last_close"],
@@ -225,6 +224,9 @@ def _style(frame: pd.DataFrame, lang: str):
         # Absent from a trade log published before the column existed.
         HI_DATE_LABEL.get(lang, "Hi date"): pd.to_datetime(frame.get("hi_date")),
         t("tl_max_fl", lang): frame["max_fl_pct"],
+        # The sale, then what it made.
+        t("tl_exit_date", lang): pd.to_datetime(frame["exit_date"]),
+        t("tl_exit_price", lang): frame["exit_price"],
         t("tl_pl", lang): frame["pl_pct"],
         t("tl_entry_code", lang): frame["entry_code"],
         t("tl_exit_code", lang): frame["exit_code"],

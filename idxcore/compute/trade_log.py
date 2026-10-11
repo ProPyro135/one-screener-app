@@ -216,7 +216,12 @@ def build(
             # arm setups that have not signalled yet; those carry no signal.
             # The other strategies only arm on a signal.
             if pending_buy or not getattr(mod, "FILL_NEXT_OPEN", False):
-                row.update(signal_date=g["date"].iloc[-1], signal_price=float(g["close"].iloc[-1]))
+                last = pd.Timestamp(g["date"].iloc[-1])
+                # The planned BUY date is the next weekday; its price is the
+                # open that day, unknown until then. ponytail: weekdays only,
+                # an IDX holiday shifts the real fill one day later.
+                row.update(signal_date=last, signal_price=float(g["close"].iloc[-1]),
+                           buy_date=last + pd.offsets.BDay(1))
             rows.append(row)
 
     return pd.DataFrame(rows, columns=COLUMNS)
@@ -298,7 +303,8 @@ def _self_check(db_path: str) -> None:
         assert signalled["signal_price"].notna().all()
         # A watchlist row with a signal is today's signal, not bought yet.
         watch = log[(log["status"] == WATCHLIST) & log["signal_date"].notna()]
-        assert watch["buy_date"].isna().all() and watch["signal_price"].notna().all()
+        assert (watch["buy_date"] > watch["signal_date"]).all()      # the planned BUY
+        assert watch["buy_price"].isna().all() and watch["signal_price"].notna().all()
         # EXIT is the cut-loss bucket by construction. Not necessarily a loss:
         # Bottom Fishing's stops trigger on the bar's low but fill at its close,
         # so a bar that dips through the stop and recovers exits in profit.
